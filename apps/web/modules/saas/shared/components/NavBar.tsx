@@ -12,6 +12,9 @@ import {
 	SettingsIcon,
 	UserCog2Icon,
 	UserCogIcon,
+	UsersIcon,
+	TrendingUpIcon,
+	BarChart3Icon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -38,12 +41,22 @@ export function NavBar() {
 			isActive: pathname === basePath,
 		},
 		{
-			label: t("app.menu.aiChatbot"),
-			href: activeOrganization
-				? `/app/${activeOrganization.slug}/chatbot`
-				: "/app/chatbot",
-			icon: BotMessageSquareIcon,
-			isActive: pathname.includes("/chatbot"),
+			label: "Leads",
+			href: "/app/dashboard/leads",
+			icon: UsersIcon,
+			isActive: pathname.includes("/dashboard/leads"),
+		},
+		{
+			label: "Pipeline",
+			href: "/app/dashboard/pipeline",
+			icon: TrendingUpIcon,
+			isActive: pathname.includes("/dashboard/pipeline"),
+		},
+		{
+			label: "Analytics",
+			href: "/app/dashboard/analytics",
+			icon: BarChart3Icon,
+			isActive: pathname.includes("/dashboard/analytics"),
 		},
 		...(activeOrganization && isOrganizationAdmin
 			? [

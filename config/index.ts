@@ -1,7 +1,7 @@
 import type { Config } from "./types";
 
 export const config = {
-	appName: "supastarter for Next.js Demo",
+	appName: "LeadMachine",
 	// Internationalization
 	i18n: {
 		// Whether internationalization should be enabled (if disabled, you still need to define the locale you want to use below and set it as the default locale)
@@ -44,6 +44,9 @@ export const config = {
 			"settings",
 			"ai-demo",
 			"organization-invitation",
+			"leads",
+			"pipeline",
+			"analytics",
 		],
 	},
 	// Users
