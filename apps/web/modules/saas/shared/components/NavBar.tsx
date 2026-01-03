@@ -42,21 +42,21 @@ export function NavBar() {
 		},
 		{
 			label: "Leads",
-			href: "/app/dashboard/leads",
+			href: "/app/leads",
 			icon: UsersIcon,
-			isActive: pathname.includes("/dashboard/leads"),
+			isActive: pathname.includes("/leads"),
 		},
 		{
 			label: "Pipeline",
-			href: "/app/dashboard/pipeline",
+			href: "/app/pipeline",
 			icon: TrendingUpIcon,
-			isActive: pathname.includes("/dashboard/pipeline"),
+			isActive: pathname.includes("/pipeline"),
 		},
 		{
 			label: "Analytics",
-			href: "/app/dashboard/analytics",
+			href: "/app/analytics",
 			icon: BarChart3Icon,
-			isActive: pathname.includes("/dashboard/analytics"),
+			isActive: pathname.includes("/analytics"),
 		},
 		...(activeOrganization && isOrganizationAdmin
 			? [
