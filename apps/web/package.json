@@ -1,9 +1,11 @@
 {
 	"dependencies": {
 		"@ai-sdk/react": "^2.0.93",
+		"@anthropic-ai/sdk": "^0.71.2",
 		"@aws-sdk/client-s3": "3.437.0",
 		"@bprogress/next": "^3.2.12",
 		"@fumadocs/content-collections": "^1.2.4",
+		"@googlemaps/google-maps-services-js": "^3.4.2",
 		"@hookform/resolvers": "^5.2.2",
 		"@next/third-parties": "16.0.3",
 		"@orpc/client": "^1.11.2",
@@ -32,6 +34,7 @@
 		"@repo/storage": "workspace:*",
 		"@repo/utils": "workspace:*",
 		"@sindresorhus/slugify": "^3.0.0",
+		"@supabase/supabase-js": "^2.89.0",
 		"@tanstack/react-query": "^5.90.9",
 		"@tanstack/react-table": "^8.21.3",
 		"ai": "^5.0.93",
