@@ -1,58 +1,32 @@
-import Anthropic from '@anthropic-ai/sdk'
+/**
+ * Analizador de Leads con Claude AI
+ * Detecta problemas, calcula score y categoriza industria
+ */
+
+import Anthropic from '@anthropic-ai/sdk';
+import type { GoogleMapsLead } from '../lead-discovery/google-maps-scraper';
 
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-})
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
 
-export interface LeadAnalysisResult {
-  score: number           // 0-100
-  problemDetected: string // qué problema tienen
-  insight: string         // observación clave
-  industry: string
-  employeeCount?: number
-  recommendedProduct: 'codetix' | 'reservaspro' | 'none'
-  reasoning: string
+export interface LeadAnalysis {
+  score: number; // 0-100
+  problem_detected: string;
+  insight: string;
+  industry: string;
+  recommended_product: 'codetix' | 'reservaspro';
 }
 
-export async function analyzeLead(lead: {
-  name: string
-  website?: string
-  phone?: string
-  address?: string
-  types?: string[]
-}): Promise<LeadAnalysisResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn('⚠️ ANTHROPIC_API_KEY no configurada, usando análisis básico')
-    return basicAnalysis(lead)
-  }
-
+/**
+ * Analiza un lead usando Claude AI
+ */
+export async function analyzeLead(
+  lead: GoogleMapsLead,
+  productType: 'codetix' | 'reservaspro'
+): Promise<LeadAnalysis> {
   try {
-    console.log(`🤖 Analizando lead: ${lead.name}...`)
-
-    const prompt = `Analiza este negocio y dame un análisis detallado:
-
-Nombre: ${lead.name}
-${lead.website ? `Website: ${lead.website}` : ''}
-${lead.phone ? `Teléfono: ${lead.phone}` : ''}
-${lead.address ? `Dirección: ${lead.address}` : ''}
-${lead.types ? `Tipo: ${lead.types.join(', ')}` : ''}
-
-Tengo 2 productos:
-1. **CodeTix**: Sistema de venta de entradas para eventos, discotecas, conciertos, teatros
-2. **ReservasPro**: Sistema de reservas online para restaurantes, barberías, spas, clínicas
-
-Analiza y responde en formato JSON:
-{
-  "score": <0-100, basado en fit con nuestros productos>,
-  "problemDetected": "<problema específico que detectes, ej: 'no tienen sistema de reservas online'>",
-  "insight": "<observación clave sobre el negocio>",
-  "industry": "<industria específica>",
-  "employeeCount": <estimación de empleados si es posible, sino null>,
-  "recommendedProduct": "<codetix|reservaspro|none>",
-  "reasoning": "<por qué recomiendas ese producto>"
-}
-
-Sé específico y basate en señales reales. Si no hay website, baja el score.`
+    const prompt = createAnalysisPrompt(lead, productType);
 
     const message = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20241022',
@@ -63,117 +37,168 @@ Sé específico y basate en señales reales. Si no hay website, baja el score.`
           content: prompt,
         },
       ],
-    })
+    });
 
-    const content = message.content[0]
-    if (content.type !== 'text') {
-      throw new Error('Respuesta inesperada de Claude')
-    }
+    const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+    
+    // Parsear la respuesta de Claude
+    const analysis = parseClaudeResponse(responseText);
 
-    // Extraer JSON de la respuesta
-    const jsonMatch = content.text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      throw new Error('No se pudo extraer JSON de la respuesta')
-    }
-
-    const analysis: LeadAnalysisResult = JSON.parse(jsonMatch[0])
-
-    console.log(`  ✓ Score: ${analysis.score}/100`)
-    console.log(`  ✓ Producto: ${analysis.recommendedProduct}`)
-
-    return analysis
-
+    return {
+      ...analysis,
+      recommended_product: productType,
+    };
   } catch (error) {
-    console.error('❌ Error analizando con Claude:', error)
-    console.log('  → Usando análisis básico como fallback')
-    return basicAnalysis(lead)
+    console.error('Error analizando lead con Claude:', error);
+    
+    // Fallback: análisis básico sin AI
+    return basicAnalysis(lead, productType);
   }
 }
 
-// Análisis básico sin Claude (fallback)
-function basicAnalysis(lead: {
-  name: string
-  website?: string
-  phone?: string
-  address?: string
-  types?: string[]
-}): LeadAnalysisResult {
-  let score = 30 // Base score
-  let recommendedProduct: 'codetix' | 'reservaspro' | 'none' = 'none'
-  let industry = 'unknown'
-  let problemDetected = 'No se pudo determinar automáticamente'
-  let insight = 'Análisis manual requerido'
+/**
+ * Crea el prompt para Claude
+ */
+function createAnalysisPrompt(lead: GoogleMapsLead, productType: 'codetix' | 'reservaspro'): string {
+  const productDescription = productType === 'codetix'
+    ? 'Codetix es un sistema de pedidos con código QR para restaurantes y bares'
+    : 'Reservaspro es un sistema de gestión de reservas para spas, salones y clínicas';
 
-  // Detectar industria y producto basado en tipos
-  if (lead.types) {
-    const typeStr = lead.types.join(' ').toLowerCase()
+  return `Analiza este negocio para determinar si es un buen prospecto para ${productDescription}.
 
-    // CodeTix leads
-    if (typeStr.includes('night_club') || typeStr.includes('disco') || 
-        typeStr.includes('theater') || typeStr.includes('event')) {
-      recommendedProduct = 'codetix'
-      industry = 'entertainment'
-      problemDetected = 'Posiblemente venden entradas manualmente o con sistemas anticuados'
-      score += 30
-    }
-    // ReservasPro leads
-    else if (typeStr.includes('restaurant') || typeStr.includes('food') ||
-             typeStr.includes('hair') || typeStr.includes('beauty') ||
-             typeStr.includes('spa') || typeStr.includes('gym')) {
-      recommendedProduct = 'reservaspro'
-      industry = typeStr.includes('food') ? 'restaurant' : 'services'
-      problemDetected = 'Probablemente gestionan reservas por teléfono o WhatsApp'
-      score += 30
-    }
+INFORMACIÓN DEL NEGOCIO:
+- Nombre: ${lead.company_name}
+- Tipo: ${lead.business_type || 'Desconocido'}
+- Ubicación: ${lead.location}
+- Rating: ${lead.rating || 'N/A'} (${lead.reviews_count || 0} reseñas)
+- Teléfono: ${lead.phone || 'No disponible'}
+- Website: ${lead.website || 'No tiene website'}
+
+ANÁLISIS REQUERIDO:
+1. Score (0-100): Califica la probabilidad de que este negocio necesite nuestro producto
+2. Problema detectado: Identifica un problema específico que podemos resolver
+3. Insight: Una observación única sobre este negocio que nos ayude a personalizar el mensaje
+4. Industria: Categoriza el tipo de negocio (ej: restaurante, spa, clínica dental)
+
+CRITERIOS DE PUNTUACIÓN:
+- +30 puntos: Tipo de negocio perfecto para el producto
+- +20 puntos: Tiene teléfono pero NO tiene website (señal de digitalización baja)
+- +15 puntos: Rating bajo (<3.5) - señal de que necesitan mejorar operaciones
+- +10 puntos: Muchas reseñas (>50) - negocio activo
+- +10 puntos: Ubicación en zona comercial/turística
+- +15 puntos: Si menciona problemas relacionados con pedidos/reservas en reseñas
+
+Responde SOLO con este formato JSON (sin markdown):
+{
+  "score": [número 0-100],
+  "problem_detected": "[problema específico en 1 frase]",
+  "insight": "[observación única en 1 frase]",
+  "industry": "[categoría del negocio]"
+}`;
+}
+
+/**
+ * Parsea la respuesta de Claude
+ */
+function parseClaudeResponse(response: string): Omit<LeadAnalysis, 'recommended_product'> {
+  try {
+    // Limpiar markdown si existe
+    const cleanResponse = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    
+    const parsed = JSON.parse(cleanResponse);
+
+    return {
+      score: Math.max(0, Math.min(100, parsed.score || 0)),
+      problem_detected: parsed.problem_detected || 'Sin problema detectado',
+      insight: parsed.insight || 'Requiere más investigación',
+      industry: parsed.industry || 'Desconocido',
+    };
+  } catch (error) {
+    console.error('Error parseando respuesta de Claude:', error);
+    throw error;
+  }
+}
+
+/**
+ * Análisis básico sin AI (fallback)
+ */
+function basicAnalysis(
+  lead: GoogleMapsLead,
+  productType: 'codetix' | 'reservaspro'
+): LeadAnalysis {
+  let score = 50; // Score base
+
+  // Tiene teléfono pero no website = buena señal
+  if (lead.phone && !lead.website) {
+    score += 20;
   }
 
-  // Ajustar score según datos disponibles
-  if (lead.website) {
-    score += 20
-    insight = 'Tiene presencia online, buen candidato'
-  } else {
-    problemDetected += '. No tiene website visible'
+  // Rating bajo = necesita mejorar
+  if (lead.rating && lead.rating < 3.5) {
+    score += 15;
   }
 
-  if (lead.phone) score += 10
+  // Muchas reseñas = negocio activo
+  if (lead.reviews_count && lead.reviews_count > 50) {
+    score += 10;
+  }
+
+  // Tipo de negocio relevante
+  const relevantTypes = productType === 'codetix'
+    ? ['restaurant', 'cafe', 'bar', 'food']
+    : ['spa', 'beauty_salon', 'hair_care', 'doctor', 'dentist'];
+
+  if (relevantTypes.some(type => lead.business_type?.includes(type))) {
+    score += 30;
+  }
+
+  const problem = !lead.website
+    ? 'No tiene presencia digital profesional'
+    : 'Podría mejorar su eficiencia operativa';
+
+  const insight = lead.rating && lead.rating < 3.5
+    ? 'Rating bajo sugiere problemas de servicio que podemos ayudar a resolver'
+    : 'Negocio activo con potencial de crecimiento';
 
   return {
-    score: Math.min(score, 100),
-    problemDetected,
+    score: Math.min(100, score),
+    problem_detected: problem,
     insight,
-    industry,
-    employeeCount: undefined,
-    recommendedProduct,
-    reasoning: 'Análisis basado en categoría del negocio',
-  }
+    industry: lead.business_type || 'General',
+    recommended_product: productType,
+  };
 }
 
-// Función para analizar múltiples leads en batch
+/**
+ * Analiza múltiples leads en batch
+ */
 export async function analyzeLeadsBatch(
-  leads: Array<{
-    name: string
-    website?: string
-    phone?: string
-    address?: string
-    types?: string[]
-  }>
-): Promise<LeadAnalysisResult[]> {
-  const results: LeadAnalysisResult[] = []
+  leads: GoogleMapsLead[],
+  productType: 'codetix' | 'reservaspro'
+): Promise<Array<GoogleMapsLead & LeadAnalysis>> {
+  const analyzed: Array<GoogleMapsLead & LeadAnalysis> = [];
 
-  console.log(`📊 Analizando ${leads.length} leads...`)
+  for (const lead of leads) {
+    try {
+      const analysis = await analyzeLead(lead, productType);
+      analyzed.push({
+        ...lead,
+        ...analysis,
+      });
 
-  for (let i = 0; i < leads.length; i++) {
-    console.log(`\n[${i + 1}/${leads.length}]`)
-    const analysis = await analyzeLead(leads[i])
-    results.push(analysis)
-
-    // Pausa para no saturar la API de Claude
-    if (i < leads.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Rate limiting: esperar 1 segundo entre llamadas a Claude
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    } catch (error) {
+      console.error(`Error analizando lead ${lead.company_name}:`, error);
+      
+      // Usar análisis básico en caso de error
+      const fallback = basicAnalysis(lead, productType);
+      analyzed.push({
+        ...lead,
+        ...fallback,
+      });
     }
   }
 
-  console.log(`\n✅ Análisis completado`)
-  return results
+  return analyzed;
 }
-

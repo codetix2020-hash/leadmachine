@@ -35,8 +35,9 @@ export default function LeadsPage() {
 			const response = await fetch(`/api/leads?${params.toString()}`)
 			const result = await response.json()
 			
-			if (result.success) {
-				setLeads(result.data)
+			// La API devuelve { leads: [...], pagination: {...} }
+			if (result.leads) {
+				setLeads(result.leads)
 			}
 		} catch (error) {
 			console.error('Error fetching leads:', error)
@@ -80,7 +81,8 @@ export default function LeadsPage() {
 
 	useEffect(() => {
 		fetchLeads()
-	}, [filters])
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [filters.type, filters.status, filters.minScore])
 
 	// Stats
 	const stats = {

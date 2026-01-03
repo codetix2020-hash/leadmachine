@@ -1,145 +1,112 @@
-import { createClient } from '@supabase/supabase-js'
-import { searchGoogleMaps, findCodetixLeads, findReservasproLeads } from '@/lib/lead-discovery/google-maps-scraper'
-import { analyzeLeadsBatch } from '@/lib/enrichment/analyze-lead'
-import { NextResponse } from 'next/server'
+/**
+ * API Endpoint: Descubrir Leads
+ * POST /api/leads/discover
+ */
 
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import {
+  searchGoogleMaps,
+  findCodetixLeads,
+  findReservasproLeads,
+} from '@/lib/lead-discovery/google-maps-scraper';
+import { analyzeLeadsBatch } from '@/lib/enrichment/analyze-lead';
+
+// Inicializar Supabase
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+);
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { query, location, type } = body
+    const body = await request.json();
+    const { query, location, type, maxResults = 20 } = body;
 
-    if (!query || !location || !type) {
+    // Validación
+    if (!location) {
       return NextResponse.json(
-        { error: 'Missing required fields: query, location, type' },
+        { error: 'Location es requerido' },
         { status: 400 }
-      )
+      );
     }
 
-    if (!['codetix', 'reservaspro'].includes(type)) {
+    if (!type || !['codetix', 'reservaspro'].includes(type)) {
       return NextResponse.json(
-        { error: 'type must be "codetix" or "reservaspro"' },
+        { error: 'Type debe ser "codetix" o "reservaspro"' },
         { status: 400 }
-      )
+      );
     }
 
-    console.log(`\n🚀 Starting lead discovery...`)
-    console.log(`   Query: ${query}`)
-    console.log(`   Location: ${location}`)
-    console.log(`   Type: ${type}\n`)
+    console.log(`🔍 Buscando leads para ${type} en ${location}...`);
 
-    // Paso 1: Buscar en Google Maps
-    console.log('📍 Step 1: Searching Google Maps...')
-    let googleLeads
-
-    if (query === 'auto') {
-      // Búsqueda automática según el tipo
-      googleLeads = type === 'codetix' 
-        ? await findCodetixLeads(location)
-        : await findReservasproLeads(location)
-    } else {
+    // 1. Buscar leads en Google Maps
+    let googleLeads;
+    if (query) {
       // Búsqueda personalizada
       googleLeads = await searchGoogleMaps({
         query,
         location,
-        maxResults: 20,
-      })
-    }
-
-    if (googleLeads.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: 'No leads found for this search',
-        count: 0,
-        leads: [],
-      })
-    }
-
-    console.log(`✅ Found ${googleLeads.length} potential leads\n`)
-
-    // Paso 2: Analizar cada lead con Claude
-    console.log('🤖 Step 2: Analyzing leads with AI...')
-    const analyses = await analyzeLeadsBatch(
-      googleLeads.map(lead => ({
-        name: lead.name,
-        website: lead.website,
-        phone: lead.phone,
-        address: lead.address,
-        types: lead.types,
-      }))
-    )
-
-    console.log('✅ Analysis complete\n')
-
-    // Paso 3: Guardar en Supabase
-    console.log('💾 Step 3: Saving to database...')
-    const leadsToInsert = googleLeads.map((googleLead, index) => {
-      const analysis = analyses[index]
-
-      return {
-        company_name: googleLead.name,
-        email: null, // Por ahora no lo tenemos
-        phone: googleLead.phone || null,
-        linkedin_url: null,
-        instagram_url: null,
-        website: googleLead.website || null,
-        type,
-        score: analysis.score,
-        status: 'new',
-        industry: analysis.industry,
-        location: googleLead.address,
-        employee_count: analysis.employeeCount || null,
-        problem_detected: analysis.problemDetected,
-        insight: analysis.insight,
+        maxResults,
+      });
+    } else {
+      // Búsqueda predefinida según tipo
+      if (type === 'codetix') {
+        googleLeads = await findCodetixLeads(location, maxResults);
+      } else {
+        googleLeads = await findReservasproLeads(location, maxResults);
       }
-    })
+    }
 
-    const { data: insertedLeads, error: insertError } = await supabase
+    console.log(`✅ Encontrados ${googleLeads.length} leads en Google Maps`);
+
+    // 2. Analizar leads con Claude AI
+    console.log('🤖 Analizando leads con Claude AI...');
+    const analyzedLeads = await analyzeLeadsBatch(googleLeads, type);
+
+    console.log('✅ Leads analizados');
+
+    // 3. Guardar en Supabase
+    console.log('💾 Guardando en Supabase...');
+    const leadsToInsert = analyzedLeads.map((lead) => ({
+      company_name: lead.company_name,
+      email: lead.email,
+      phone: lead.phone,
+      website: lead.website,
+      type: type,
+      score: lead.score,
+      status: 'new',
+      industry: lead.industry,
+      location: lead.location,
+      problem_detected: lead.problem_detected,
+      insight: lead.insight,
+    }));
+
+    const { data, error } = await supabase
       .from('leads')
       .insert(leadsToInsert)
-      .select()
+      .select();
 
-    if (insertError) {
-      console.error('❌ Error inserting leads:', insertError)
-      return NextResponse.json(
-        { error: 'Failed to save leads to database', details: insertError.message },
-        { status: 500 }
-      )
+    if (error) {
+      console.error('Error guardando en Supabase:', error);
+      throw error;
     }
 
-    console.log(`✅ Saved ${insertedLeads?.length || 0} leads to database\n`)
+    console.log(`✅ ${data?.length || 0} leads guardados en Supabase`);
 
-    // Retornar resultados
     return NextResponse.json({
       success: true,
-      message: `Successfully discovered and saved ${insertedLeads?.length || 0} leads`,
-      count: insertedLeads?.length || 0,
-      leads: insertedLeads?.map((lead, index) => ({
-        ...lead,
-        googleMapsData: {
-          rating: googleLeads[index].rating,
-          reviewCount: googleLeads[index].reviewCount,
-          lat: googleLeads[index].lat,
-          lng: googleLeads[index].lng,
-          placeId: googleLeads[index].placeId,
-        },
-        analysis: analyses[index],
-      })),
-    })
-
-  } catch (error: any) {
-    console.error('❌ Error in lead discovery:', error)
+      leads: data,
+      count: data?.length || 0,
+    });
+  } catch (error) {
+    console.error('Error en /api/leads/discover:', error);
     return NextResponse.json(
-      { 
-        error: 'Lead discovery failed', 
-        details: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      {
+        error: 'Error descubriendo leads',
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
-    )
+    );
   }
 }

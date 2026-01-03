@@ -36,5 +36,8 @@
 			"prisma-zod-generator",
 			"sharp"
 		]
+	},
+	"dependencies": {
+		"node-fetch": "^3.3.2"
 	}
 }

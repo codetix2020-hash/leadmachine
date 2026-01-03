@@ -1,193 +1,183 @@
-import { Client, PlaceInputType } from '@googlemaps/google-maps-services-js'
+/**
+ * Google Maps Scraper para LEADMACHINE
+ * Encuentra negocios usando Google Places API
+ */
 
-const client = new Client({})
+import { Client } from '@googlemaps/google-maps-services-js';
+
+const client = new Client({});
 
 export interface GoogleMapsLead {
-  name: string
-  address: string
-  phone?: string
-  website?: string
-  rating?: number
-  reviewCount?: number
-  lat: number
-  lng: number
-  placeId: string
-  types?: string[]
+  company_name: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  location: string;
+  latitude?: number;
+  longitude?: number;
+  rating?: number;
+  reviews_count?: number;
+  business_type?: string;
+  google_maps_url?: string;
 }
 
-export interface SearchGoogleMapsParams {
-  query: string      // ej: "barberías"
-  location: string   // ej: "Barcelona, Spain"
-  radius?: number    // metros (default: 5000)
-  maxResults?: number // default: 20
+interface SearchParams {
+  query: string;
+  location: string;
+  radius?: number; // en metros
+  maxResults?: number;
 }
 
-export async function searchGoogleMaps(params: SearchGoogleMapsParams): Promise<GoogleMapsLead[]> {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY
+/**
+ * Busca negocios en Google Maps
+ */
+export async function searchGoogleMaps(
+  params: SearchParams
+): Promise<GoogleMapsLead[]> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
 
   if (!apiKey) {
-    throw new Error('GOOGLE_MAPS_API_KEY no está configurada')
+    throw new Error('GOOGLE_MAPS_API_KEY no está configurada');
   }
 
-  const { query, location, radius = 5000, maxResults = 20 } = params
-
   try {
-    console.log(`🔍 Buscando: "${query}" en ${location}...`)
+    const { query, location, radius = 5000, maxResults = 20 } = params;
 
-    // Paso 1: Geocodificar la ubicación
+    // 1. Geocode la ubicación
     const geocodeResponse = await client.geocode({
       params: {
         address: location,
         key: apiKey,
       },
-    })
+    });
 
     if (geocodeResponse.data.results.length === 0) {
-      throw new Error(`No se pudo encontrar la ubicación: ${location}`)
+      throw new Error(`No se encontró la ubicación: ${location}`);
     }
 
-    const locationCoords = geocodeResponse.data.results[0].geometry.location
+    const { lat, lng } = geocodeResponse.data.results[0].geometry.location;
 
-    console.log(`📍 Ubicación: ${locationCoords.lat}, ${locationCoords.lng}`)
-
-    // Paso 2: Buscar lugares cercanos
-    const searchResponse = await client.placesNearby({
+    // 2. Buscar lugares cercanos
+    const placesResponse = await client.textSearch({
       params: {
-        location: locationCoords,
+        query: `${query} ${location}`,
+        location: { lat, lng },
         radius,
-        keyword: query,
         key: apiKey,
       },
-    })
+    });
 
-    const places = searchResponse.data.results.slice(0, maxResults)
-    console.log(`✅ Encontrados ${places.length} lugares`)
+    const results = placesResponse.data.results.slice(0, maxResults);
+    const leads: GoogleMapsLead[] = [];
 
-    // Paso 3: Obtener detalles de cada lugar
-    const leads: GoogleMapsLead[] = []
-
-    for (const place of places) {
+    // 3. Obtener detalles de cada lugar
+    for (const place of results) {
       try {
         const detailsResponse = await client.placeDetails({
           params: {
-            place_id: place.place_id!,
+            place_id: place.place_id || '',
             fields: [
               'name',
-              'formatted_address',
               'formatted_phone_number',
               'website',
+              'formatted_address',
+              'geometry',
               'rating',
               'user_ratings_total',
-              'geometry',
               'types',
+              'url',
             ],
             key: apiKey,
           },
-        })
+        });
 
-        const details = detailsResponse.data.result
+        const details = detailsResponse.data.result;
 
         leads.push({
-          name: details.name || place.name || 'Sin nombre',
-          address: details.formatted_address || place.vicinity || 'Sin dirección',
+          company_name: details.name || place.name || 'Sin nombre',
           phone: details.formatted_phone_number,
           website: details.website,
+          location: details.formatted_address || place.formatted_address || location,
+          latitude: details.geometry?.location?.lat,
+          longitude: details.geometry?.location?.lng,
           rating: details.rating,
-          reviewCount: details.user_ratings_total,
-          lat: details.geometry?.location.lat || place.geometry!.location.lat,
-          lng: details.geometry?.location.lng || place.geometry!.location.lng,
-          placeId: place.place_id!,
-          types: details.types || place.types,
-        })
+          reviews_count: details.user_ratings_total,
+          business_type: details.types?.[0],
+          google_maps_url: details.url,
+        });
 
-        console.log(`  ✓ ${details.name}`)
-
-        // Pequeña pausa para no saturar la API
-        await new Promise(resolve => setTimeout(resolve, 100))
-
+        // Rate limiting: esperar 100ms entre llamadas
+        await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (error) {
-        console.error(`  ✗ Error obteniendo detalles de ${place.name}:`, error)
+        console.error(`Error obteniendo detalles del lugar ${place.place_id}:`, error);
       }
     }
 
-    console.log(`\n🎉 Total de leads procesados: ${leads.length}`)
-    return leads
-
+    return leads;
   } catch (error) {
-    console.error('❌ Error en searchGoogleMaps:', error)
-    throw error
+    console.error('Error en searchGoogleMaps:', error);
+    throw error;
   }
 }
 
-// Función helper para buscar por tipo de negocio
-export async function searchByBusinessType(
-  type: 'restaurant' | 'bar' | 'cafe' | 'store' | 'salon' | string,
-  location: string,
-  radius?: number
-): Promise<GoogleMapsLead[]> {
-  return searchGoogleMaps({
-    query: type,
+/**
+ * Busca restaurantes y bares para Codetix (sistema de pedidos QR)
+ */
+export async function findCodetixLeads(location: string, maxResults = 20): Promise<GoogleMapsLead[]> {
+  const leads: GoogleMapsLead[] = [];
+
+  // Buscar restaurantes
+  const restaurants = await searchGoogleMaps({
+    query: 'restaurantes',
     location,
-    radius,
-  })
+    radius: 10000,
+    maxResults: Math.ceil(maxResults / 2),
+  });
+
+  // Buscar bares
+  const bars = await searchGoogleMaps({
+    query: 'bares cafeterías',
+    location,
+    radius: 10000,
+    maxResults: Math.ceil(maxResults / 2),
+  });
+
+  leads.push(...restaurants, ...bars);
+
+  return leads.slice(0, maxResults);
 }
 
-// Función helper para buscar negocios perfectos para CodeTix
-export async function findCodetixLeads(location: string): Promise<GoogleMapsLead[]> {
-  const queries = [
-    'discoteca',
-    'club nocturno',
-    'sala de conciertos',
-    'teatro',
-    'eventos',
-  ]
+/**
+ * Busca spas, salones, clínicas para Reservaspro (sistema de reservas)
+ */
+export async function findReservasproLeads(location: string, maxResults = 20): Promise<GoogleMapsLead[]> {
+  const leads: GoogleMapsLead[] = [];
 
-  const allLeads: GoogleMapsLead[] = []
+  // Buscar spas
+  const spas = await searchGoogleMaps({
+    query: 'spa centro estético',
+    location,
+    radius: 10000,
+    maxResults: Math.ceil(maxResults / 3),
+  });
 
-  for (const query of queries) {
-    try {
-      const leads = await searchGoogleMaps({
-        query,
-        location,
-        radius: 10000,
-        maxResults: 10,
-      })
-      allLeads.push(...leads)
-    } catch (error) {
-      console.error(`Error buscando ${query}:`, error)
-    }
-  }
+  // Buscar peluquerías
+  const salons = await searchGoogleMaps({
+    query: 'peluquerías salones belleza',
+    location,
+    radius: 10000,
+    maxResults: Math.ceil(maxResults / 3),
+  });
 
-  return allLeads
+  // Buscar clínicas
+  const clinics = await searchGoogleMaps({
+    query: 'clínicas dentales médicas',
+    location,
+    radius: 10000,
+    maxResults: Math.ceil(maxResults / 3),
+  });
+
+  leads.push(...spas, ...salons, ...clinics);
+
+  return leads.slice(0, maxResults);
 }
-
-// Función helper para buscar negocios perfectos para ReservasPro
-export async function findReservasproLeads(location: string): Promise<GoogleMapsLead[]> {
-  const queries = [
-    'restaurante',
-    'barbería',
-    'peluquería',
-    'spa',
-    'gimnasio',
-    'clínica dental',
-  ]
-
-  const allLeads: GoogleMapsLead[] = []
-
-  for (const query of queries) {
-    try {
-      const leads = await searchGoogleMaps({
-        query,
-        location,
-        radius: 10000,
-        maxResults: 10,
-      })
-      allLeads.push(...leads)
-    } catch (error) {
-      console.error(`Error buscando ${query}:`, error)
-    }
-  }
-
-  return allLeads
-}
-
