@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { db, DUMMY_USER_ID } from '@/lib/db/client';
+import { db, DUMMY_USER_ID, initializeDatabase } from '@/lib/db/client';
 import { leads } from '@/lib/db/schema';
 import { eq, and, gte, desc, asc, sql } from 'drizzle-orm';
 
@@ -14,6 +14,7 @@ import { eq, and, gte, desc, asc, sql } from 'drizzle-orm';
  * GET - Obtener leads con filtros
  */
 export async function GET(request: NextRequest) {
+	await initializeDatabase();
 	try {
 		const searchParams = request.nextUrl.searchParams;
 
@@ -49,22 +50,23 @@ export async function GET(request: NextRequest) {
 			conditions.push(eq(leads.industry, industry));
 		}
 
-		// Obtener total para paginación
-		const totalResult = await db
-			.select({ count: sql<number>`count(*)` })
+		// Obtener total para paginación (usar countAllRows para mejor compatibilidad)
+		const allLeads = await db
+			.select()
 			.from(leads)
 			.where(and(...conditions));
-
-		const total = totalResult[0]?.count || 0;
+		
+		const total = allLeads.length;
 
 		// Obtener leads paginados
-		const data = await db
+		const allData = await db
 			.select()
 			.from(leads)
 			.where(and(...conditions))
-			.orderBy(desc(leads.score), desc(leads.created_at))
-			.limit(limit)
-			.offset(offset);
+			.orderBy(desc(leads.score), desc(leads.created_at));
+		
+		// Aplicar paginación manualmente (drizzle libsql puede tener problemas con limit/offset)
+		const data = allData.slice(offset, offset + limit);
 
 		return NextResponse.json({
 			leads: data || [],
@@ -85,6 +87,7 @@ export async function GET(request: NextRequest) {
  * PUT - Actualizar un lead
  */
 export async function PUT(request: NextRequest) {
+	await initializeDatabase();
 	try {
 		const body = await request.json();
 		const { id, ...updates } = body;
@@ -118,6 +121,7 @@ export async function PUT(request: NextRequest) {
  * DELETE - Eliminar un lead
  */
 export async function DELETE(request: NextRequest) {
+	await initializeDatabase();
 	try {
 		const searchParams = request.nextUrl.searchParams;
 		const id = searchParams.get('id');

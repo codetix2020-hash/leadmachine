@@ -10,10 +10,11 @@ import {
 	findReservasproLeads,
 } from '@/lib/lead-discovery/google-maps-scraper';
 import { analyzeLeadsBatch } from '@/lib/enrichment/analyze-lead';
-import { db, DUMMY_USER_ID } from '@/lib/db/client';
+import { db, DUMMY_USER_ID, initializeDatabase } from '@/lib/db/client';
 import { leads } from '@/lib/db/schema';
 
 export async function POST(request: NextRequest) {
+	await initializeDatabase();
 	try {
 		const body = await request.json();
 		const { query, location, type, maxResults = 20 } = body;
