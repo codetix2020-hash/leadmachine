@@ -14,36 +14,20 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import type { PropsWithChildren } from "react";
 
+// 🔓 Layout sin autenticación
 export default async function SaaSLayout({ children }: PropsWithChildren) {
 	const locale = await getLocale();
 	const messages = await getMessages();
-	const session = await getSession();
-
-	if (!session) {
-		redirect("/auth/login");
-	}
+	// const session = await getSession(); // DESHABILITADO
+	// if (!session) { redirect("/auth/login"); } // DESHABILITADO
 
 	const queryClient = getServerQueryClient();
 
-	await queryClient.prefetchQuery({
-		queryKey: sessionQueryKey,
-		queryFn: () => session,
-	});
-
-	if (config.organizations.enable) {
-		await queryClient.prefetchQuery({
-			queryKey: organizationListQueryKey,
-			queryFn: getOrganizationList,
-		});
-	}
-
-	if (config.users.enableBilling) {
-		await queryClient.prefetchQuery(
-			orpc.payments.listPurchases.queryOptions({
-				input: {},
-			}),
-		);
-	}
+	// Prefetch deshabilitado para evitar errores sin sesión
+	// await queryClient.prefetchQuery({
+	// 	queryKey: sessionQueryKey,
+	// 	queryFn: () => session,
+	// });
 
 	return (
 		<Document locale={locale}>
