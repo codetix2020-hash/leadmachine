@@ -1,129 +1,114 @@
-/**
- * Contact Finder
- * Encuentra información de contacto y decision makers
- */
-
-export interface ContactInfo {
-	decisionMaker?: {
-		name: string;
-		title: string;
-		linkedinUrl?: string;
-		email?: string;
-		phone?: string;
-		confidence: number;
-	};
-	alternativeContacts: Array<{
-		name: string;
-		role: string;
-		email?: string;
-		linkedinUrl?: string;
-	}>;
-	genericEmails: string[];
+interface ContactInfo {
+	emails: string[]; // Todos los emails encontrados
+	primaryEmail?: string;
+	confidence: number; // 0-100
 	phones: string[];
-	bestContactMethod: 'email' | 'linkedin' | 'phone' | 'instagram';
+	whatsappAvailable: boolean;
+	linkedinUrl?: string;
+	instagramUrl?: string;
+	bestContactMethod: 'email' | 'whatsapp' | 'linkedin' | 'phone' | 'instagram' | 'none';
 }
 
 export async function findContacts(lead: {
-	name: string;
+	companyName: string;
 	website?: string;
-	linkedin?: string;
-	email?: string;
 	phone?: string;
+	location?: string;
 }): Promise<ContactInfo> {
 	const contacts: ContactInfo = {
-		alternativeContacts: [],
-		genericEmails: [],
-		phones: [],
-		bestContactMethod: 'email',
+		emails: [],
+		phones: lead.phone ? [lead.phone] : [],
+		whatsappAvailable: false,
+		confidence: 0,
+		bestContactMethod: 'none',
 	};
 
+	// 1. Buscar emails en website
+	if (lead.website) {
+		const websiteEmails = await scrapeEmailsFromWebsite(lead.website);
+		contacts.emails.push(...websiteEmails);
+	}
+
+	// 2. Inferir email desde website
+	if (lead.website && contacts.emails.length === 0) {
+		const inferredEmails = inferEmailsFromDomain(lead.website, lead.companyName);
+		contacts.emails.push(...inferredEmails);
+		contacts.confidence = 60; // Inferido, no confirmado
+	}
+
+	// 3. WhatsApp detection (España: muchos negocios usan WhatsApp)
+	if (lead.phone) {
+		// En España, casi todo número es WhatsApp
+		contacts.whatsappAvailable = true;
+	}
+
+	// 4. Buscar en LinkedIn
+	// TODO: Implementar scraping LinkedIn
+
+	// 5. Determinar mejor método
+	if (contacts.emails.length > 0) {
+		contacts.primaryEmail = contacts.emails[0];
+		contacts.bestContactMethod = 'email';
+		contacts.confidence = Math.max(contacts.confidence, 80);
+	} else if (contacts.whatsappAvailable) {
+		contacts.bestContactMethod = 'whatsapp';
+		contacts.confidence = 90; // WhatsApp muy confiable en España
+	} else if (lead.phone) {
+		contacts.bestContactMethod = 'phone';
+		contacts.confidence = 70;
+	}
+
+	return contacts;
+}
+
+async function scrapeEmailsFromWebsite(url: string): Promise<string[]> {
 	try {
-		// 1. Scraping website para emails y teléfonos
-		if (lead.website) {
-			try {
-				const html = await fetch(lead.website).then((r) => r.text());
-				contacts.genericEmails = extractEmails(html);
-				contacts.phones = extractPhones(html);
-			} catch (e) {
-				// Ignorar errores
-			}
-		}
+		const response = await fetch(url, {
+			headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+		});
+		const html = await response.text();
 
-		// 2. Usar datos existentes
-		if (lead.email) {
-			contacts.genericEmails.push(lead.email);
-		}
-		if (lead.phone) {
-			contacts.phones.push(lead.phone);
-		}
+		// Regex para emails
+		const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+		const matches = html.match(emailRegex) || [];
 
-		// 3. Intentar inferir email de decision maker
-		if (lead.website && contacts.genericEmails.length === 0) {
-			const inferred = inferEmail(lead.name, lead.website);
-			if (inferred) {
-				contacts.genericEmails.push(inferred);
-			}
-		}
+		// Filtrar emails comunes/genéricos y spam
+		const filtered = matches.filter(
+			(email) =>
+				!email.includes('example.com') &&
+				!email.includes('domain.com') &&
+				!email.includes('wix.com') &&
+				!email.includes('sentry.io') &&
+				!email.includes('google.com') &&
+				!email.includes('facebook.com') &&
+				!email.includes('twitter.com')
+		);
 
-		// 4. Determinar mejor método de contacto
-		contacts.bestContactMethod = determineBestMethod(contacts);
-
-		return contacts;
+		// Deduplicar
+		return [...new Set(filtered)];
 	} catch (error) {
-		console.error('Error finding contacts:', error);
-		return contacts;
+		console.error('Error scraping emails:', error);
+		return [];
 	}
 }
 
-function extractEmails(html: string): string[] {
-	const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-	const emails = html.match(emailRegex) || [];
-	return [...new Set(emails)]; // Eliminar duplicados
-}
-
-function extractPhones(html: string): string[] {
-	const phoneRegex = /[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}/g;
-	const phones = html.match(phoneRegex) || [];
-	return [...new Set(phones)]; // Eliminar duplicados
-}
-
-function inferEmail(name: string, website: string): string | undefined {
+function inferEmailsFromDomain(website: string, companyName: string): string[] {
 	try {
 		const domain = new URL(website).hostname.replace('www.', '');
-		const [firstName, ...lastNameParts] = name.toLowerCase().split(' ');
-		const lastName = lastNameParts.join('');
+		const businessName = companyName
+			.toLowerCase()
+			.replace(/[^a-z0-9]/g, '')
+			.substring(0, 20);
 
-		// Probar combinaciones comunes
-		const possibilities = [
-			`${firstName}@${domain}`,
-			`${firstName}.${lastName}@${domain}`,
-			`${firstName[0]}${lastName}@${domain}`,
-			`${firstName}${lastName[0]}@${domain}`,
+		// Patrones comunes
+		return [
 			`info@${domain}`,
 			`contacto@${domain}`,
+			`hola@${domain}`,
+			`${businessName}@${domain}`,
 			`contact@${domain}`,
 		];
-
-		// Retornar primera opción más probable
-		return possibilities[4] || possibilities[0]; // info@ o nombre@
-	} catch (e) {
-		return undefined;
+	} catch (error) {
+		return [];
 	}
 }
-
-function determineBestMethod(contacts: ContactInfo): 'email' | 'linkedin' | 'phone' | 'instagram' {
-	if (contacts.decisionMaker?.email) {
-		return 'email';
-	}
-	if (contacts.genericEmails.length > 0) {
-		return 'email';
-	}
-	if (contacts.phones.length > 0) {
-		return 'phone';
-	}
-	if (contacts.decisionMaker?.linkedinUrl) {
-		return 'linkedin';
-	}
-	return 'email';
-}
-

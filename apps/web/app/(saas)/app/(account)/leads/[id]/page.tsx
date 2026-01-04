@@ -8,6 +8,8 @@ import { useRouter } from 'next/navigation';
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
 	const [lead, setLead] = useState<any>(null);
 	const [enrichment, setEnrichment] = useState<any>(null);
+	const [contactInfo, setContactInfo] = useState<any>(null);
+	const [whatsappLink, setWhatsappLink] = useState<string | null>(null);
 	const [enriching, setEnriching] = useState(false);
 	const [outreaching, setOutreaching] = useState(false);
 	const [loading, setLoading] = useState(true);
@@ -95,11 +97,18 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 	}
 
 	async function startOutreach() {
-		if (!confirm('¿Iniciar secuencia de outreach automático? Se enviará un email inicial y se programarán 6 follow-ups.')) {
+		if (
+			!confirm(
+				'¿Iniciar secuencia de outreach automático? Se enviará un mensaje inicial y se programarán 6 follow-ups.'
+			)
+		) {
 			return;
 		}
 
 		setOutreaching(true);
+		setWhatsappLink(null);
+		setContactInfo(null);
+
 		try {
 			const id = leadId || (await params).id;
 
@@ -114,8 +123,22 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
 			const data = await res.json();
 
+			setContactInfo(data.contacts);
+
 			if (data.success) {
-				alert('✅ Email inicial enviado. Follow-ups programados automáticamente.');
+				if (data.whatsappLink) {
+					// WhatsApp
+					setWhatsappLink(data.whatsappLink);
+					alert('✅ Mensaje generado. Click en "Enviar WhatsApp" para abrir.');
+				} else if (data.method === 'email') {
+					// Email
+					alert('✅ Email enviado. Follow-ups programados automáticamente.');
+				} else if (data.method === 'phone') {
+					// Teléfono
+					alert('✅ Script generado. Ver abajo para llamar.');
+				} else {
+					alert('✅ Outreach iniciado correctamente.');
+				}
 			} else {
 				alert(`❌ Error: ${data.error || 'Unknown error'}`);
 			}
