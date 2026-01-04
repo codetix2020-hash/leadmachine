@@ -69,15 +69,20 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 			}
 
 			const data = await res.json();
-			setEnrichment(data.enrichment);
 
-			// Actualizar lead localmente
-			if (data.enrichment?.predictiveScores) {
-				setLead((prev: any) => ({
-					...prev,
-					score: data.enrichment.predictiveScores.closeProbability || prev.score,
-					enrichmentData: JSON.stringify(data.enrichment),
-				}));
+			// Asegurar que se actualiza el estado
+			if (data.enrichment) {
+				setEnrichment(data.enrichment);
+				console.log('✅ Enrichment updated:', data.enrichment);
+
+				// Actualizar lead localmente
+				if (data.enrichment?.predictiveScores) {
+					setLead((prev: any) => ({
+						...prev,
+						score: data.enrichment.predictiveScores.closeProbability || prev.score,
+						enrichmentData: JSON.stringify(data.enrichment),
+					}));
+				}
 			}
 
 			alert('✅ Análisis profundo completado!');
@@ -148,7 +153,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 					<p className="text-gray-600">{lead.location}</p>
 					{lead.industry && <p className="text-sm text-gray-500 mt-1">Industria: {lead.industry}</p>}
 				</div>
-				<div className="flex gap-3">
+				<div className="flex gap-3 flex-wrap">
 					<Button variant="outline" onClick={() => router.push('/app/leads')}>
 						← Volver
 					</Button>
@@ -156,7 +161,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 						{enriching ? '⏳ Analizando (15-20seg)...' : '🔍 Análisis Profundo'}
 					</Button>
 					{enrichment && (
-						<Button onClick={startOutreach} disabled={outreaching || !lead.email} size="lg" variant="default">
+						<Button
+							onClick={startOutreach}
+							disabled={!enrichment || outreaching || !lead?.email}
+							size="lg"
+							variant="default"
+						>
 							{outreaching ? '📧 Enviando...' : '🚀 Iniciar Outreach'}
 						</Button>
 					)}
