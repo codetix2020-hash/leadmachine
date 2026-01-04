@@ -50,6 +50,15 @@ export async function startOutreachSequence(params: { leadId: string; lead: any;
 
 		if (result.success) {
 			await scheduleFollowUps({ leadId, lead, enrichment, method: 'email' });
+			
+			// Inicializar secuencia de persistencia completa (90 días)
+			try {
+				const { initializePersistenceSequence } = await import('@/lib/outreach/persistence-engine');
+				await initializePersistenceSequence({ leadId, lead, enrichment });
+				console.log(`✅ Persistence sequence initialized for: ${lead.company_name || lead.companyName}`);
+			} catch (e) {
+				console.error('Error initializing persistence sequence:', e);
+			}
 		}
 	} else if (method === 'whatsapp') {
 		// Convertir email a mensaje WhatsApp
