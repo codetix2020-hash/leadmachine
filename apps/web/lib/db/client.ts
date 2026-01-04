@@ -88,28 +88,8 @@ async function initializeDatabase() {
 				)`,
 			];
 
-			for (const migration of migrations) {
-				await sqlite.execute(migration);
-			}
-
-			const indexes = [
-				'CREATE INDEX IF NOT EXISTS idx_leads_user_id ON leads(user_id)',
-				'CREATE INDEX IF NOT EXISTS idx_leads_type ON leads(type)',
-				'CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status)',
-				'CREATE INDEX IF NOT EXISTS idx_leads_score ON leads(score DESC)',
-				'CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at DESC)',
-				'CREATE INDEX IF NOT EXISTS idx_conversations_lead_id ON conversations(lead_id)',
-				'CREATE INDEX IF NOT EXISTS idx_conversations_channel ON conversations(channel)',
-				'CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at DESC)',
-				'CREATE INDEX IF NOT EXISTS idx_outreach_sequences_lead_id ON outreach_sequences(lead_id)',
-				'CREATE INDEX IF NOT EXISTS idx_outreach_sequences_status ON outreach_sequences(status)',
-				'CREATE INDEX IF NOT EXISTS idx_outreach_sequences_next_action_date ON outreach_sequences(next_action_date)',
-			'CREATE INDEX IF NOT EXISTS idx_analytics_date ON analytics(date DESC)',
-			'CREATE INDEX IF NOT EXISTS idx_leads_source ON leads(source)',
-		];
-
-		for (const index of indexes) {
-			await sqlite.execute(index);
+		for (const migration of migrations) {
+			await sqlite.execute(migration);
 		}
 
 		// Crear tabla search_jobs si no existe
@@ -128,26 +108,50 @@ async function initializeDatabase() {
 			)
 		`);
 
-		// Agregar columnas source y source_data a leads si no existen (migración)
+		// PRIMERO: Agregar columnas source y source_data a leads si no existen (migración) - ANTES de crear índices
 		try {
-			await sqlite.execute('ALTER TABLE leads ADD COLUMN source TEXT');
+			const columnsResult = await sqlite.execute("PRAGMA table_info(leads)");
+			const columnNames = (columnsResult.rows || []).map((row: any) => row.name || row[1]);
+			
+			if (!columnNames.includes('source')) {
+				await sqlite.execute('ALTER TABLE leads ADD COLUMN source TEXT');
+			}
+			if (!columnNames.includes('source_data')) {
+				await sqlite.execute('ALTER TABLE leads ADD COLUMN source_data TEXT');
+			}
+			if (!columnNames.includes('enrichment_data')) {
+				await sqlite.execute('ALTER TABLE leads ADD COLUMN enrichment_data TEXT');
+			}
+			if (!columnNames.includes('last_enriched_at')) {
+				await sqlite.execute('ALTER TABLE leads ADD COLUMN last_enriched_at TEXT');
+			}
 		} catch (e) {
-			// Columna ya existe, ignorar
+			console.warn('Warning adding columns:', e);
 		}
-		try {
-			await sqlite.execute('ALTER TABLE leads ADD COLUMN source_data TEXT');
-		} catch (e) {
-			// Columna ya existe, ignorar
-		}
-		try {
-			await sqlite.execute('ALTER TABLE leads ADD COLUMN enrichment_data TEXT');
-		} catch (e) {
-			// Columna ya existe, ignorar
-		}
-		try {
-			await sqlite.execute('ALTER TABLE leads ADD COLUMN last_enriched_at TEXT');
-		} catch (e) {
-			// Columna ya existe, ignorar
+
+		// SEGUNDO: Índices (después de agregar columnas)
+		const indexes = [
+			'CREATE INDEX IF NOT EXISTS idx_leads_user_id ON leads(user_id)',
+			'CREATE INDEX IF NOT EXISTS idx_leads_type ON leads(type)',
+			'CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status)',
+			'CREATE INDEX IF NOT EXISTS idx_leads_score ON leads(score DESC)',
+			'CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at DESC)',
+			'CREATE INDEX IF NOT EXISTS idx_conversations_lead_id ON conversations(lead_id)',
+			'CREATE INDEX IF NOT EXISTS idx_conversations_channel ON conversations(channel)',
+			'CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at DESC)',
+			'CREATE INDEX IF NOT EXISTS idx_outreach_sequences_lead_id ON outreach_sequences(lead_id)',
+			'CREATE INDEX IF NOT EXISTS idx_outreach_sequences_status ON outreach_sequences(status)',
+			'CREATE INDEX IF NOT EXISTS idx_outreach_sequences_next_action_date ON outreach_sequences(next_action_date)',
+			'CREATE INDEX IF NOT EXISTS idx_analytics_date ON analytics(date DESC)',
+			'CREATE INDEX IF NOT EXISTS idx_leads_source ON leads(source)', // Ahora source ya existe
+		];
+
+		for (const index of indexes) {
+			try {
+				await sqlite.execute(index);
+			} catch (e) {
+				console.warn(`Warning creating index: ${index}`, e);
+			}
 		}
 
 			// Habilitar foreign keys
