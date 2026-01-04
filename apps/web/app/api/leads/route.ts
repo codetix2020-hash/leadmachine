@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { DUMMY_USER_ID } from '@/lib/supabase/client';
+import { DUMMY_USER_ID } from '@/lib/auth/constants';
 
 // 🔓 Inicializar Supabase con Service Role Key
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

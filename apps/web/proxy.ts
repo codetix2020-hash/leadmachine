@@ -19,16 +19,17 @@ export default async function proxy(req: NextRequest) {
 			return NextResponse.redirect(new URL("/", origin));
 		}
 
-		if (!sessionCookie) {
-			return NextResponse.redirect(
-				new URL(
-					withQuery("/auth/login", {
-						redirectTo: pathname,
-					}),
-					origin,
-				),
-			);
-		}
+		// 🔓 AUTH DESHABILITADO - Permitir acceso sin sesión
+		// if (!sessionCookie) {
+		// 	return NextResponse.redirect(
+		// 		new URL(
+		// 			withQuery("/auth/login", {
+		// 				redirectTo: pathname,
+		// 			}),
+		// 			origin,
+		// 		),
+		// 	);
+		// }
 
 		return response;
 	}

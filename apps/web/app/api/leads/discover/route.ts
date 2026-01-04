@@ -11,7 +11,7 @@ import {
   findReservasproLeads,
 } from '@/lib/lead-discovery/google-maps-scraper';
 import { analyzeLeadsBatch } from '@/lib/enrichment/analyze-lead';
-import { DUMMY_USER_ID } from '@/lib/supabase/client';
+import { DUMMY_USER_ID } from '@/lib/auth/constants';
 
 // Inicializar Supabase con Service Role Key para escritura
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;

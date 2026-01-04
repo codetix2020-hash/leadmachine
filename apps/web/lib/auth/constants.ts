@@ -1,4 +1,3 @@
 // 🔓 USER ID DUMMY para desarrollo sin autenticación
-// Ahora se exporta desde @/lib/supabase/client
-export { DUMMY_USER_ID } from '@/lib/supabase/client';
+export const DUMMY_USER_ID = "00000000-0000-0000-0000-000000000000";
 
