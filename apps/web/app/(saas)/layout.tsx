@@ -29,17 +29,14 @@ export default async function SaaSLayout({ children }: PropsWithChildren) {
 	// 	queryFn: () => session,
 	// });
 
+	// 🔓 Sin providers que requieren auth - render directo
 	return (
 		<Document locale={locale}>
 			<NextIntlClientProvider messages={messages}>
 				<HydrationBoundary state={dehydrate(queryClient)}>
-					<SessionProvider>
-						<ActiveOrganizationProvider>
-							<ConfirmationAlertProvider>
-								{children}
-							</ConfirmationAlertProvider>
-						</ActiveOrganizationProvider>
-					</SessionProvider>
+					<ConfirmationAlertProvider>
+						{children}
+					</ConfirmationAlertProvider>
 				</HydrationBoundary>
 			</NextIntlClientProvider>
 		</Document>

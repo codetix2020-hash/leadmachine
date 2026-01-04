@@ -59,8 +59,8 @@ async function executeMigration() {
 				const response = await fetch(`${supabaseUrl}/rest/v1/rpc/exec_sql`, {
 					method: 'POST',
 					headers: {
-						'apikey': supabaseSecretKey,
-						'Authorization': `Bearer ${supabaseSecretKey}`,
+						'apikey': supabaseSecretKey!,
+						'Authorization': `Bearer ${supabaseSecretKey!}`,
 						'Content-Type': 'application/json',
 						'Prefer': 'return=representation',
 					},
