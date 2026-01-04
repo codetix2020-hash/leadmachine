@@ -21,6 +21,7 @@ export default function LeadsPage() {
 		query: '',
 		location: '',
 		type: 'reservaspro' as 'codetix' | 'reservaspro',
+		sources: ['google', 'facebook'] as ('google' | 'instagram' | 'linkedin' | 'facebook' | 'yelp')[],
 	})
 
 	// Cargar leads
@@ -77,9 +78,17 @@ export default function LeadsPage() {
 			const result = await response.json()
 			
 			if (result.success) {
-				alert(`¡${result.count} leads encontrados!`)
+				const sourcesInfo = result.stats?.bySources 
+					? Object.entries(result.stats.bySources).map(([source, count]) => `${source}: ${count}`).join(', ')
+					: '';
+				alert(`¡${result.count} leads encontrados! ${sourcesInfo ? `(${sourcesInfo})` : ''}`)
 				setShowModal(false)
-				setSearchForm({ query: '', location: '', type: 'reservaspro' })
+				setSearchForm({ 
+					query: '', 
+					location: '', 
+					type: 'reservaspro',
+					sources: ['google', 'facebook']
+				})
 				fetchLeads() // Recargar lista
 			} else {
 				alert(`Error: ${result.error}`)

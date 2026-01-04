@@ -100,12 +100,41 @@ async function initializeDatabase() {
 				'CREATE INDEX IF NOT EXISTS idx_outreach_sequences_lead_id ON outreach_sequences(lead_id)',
 				'CREATE INDEX IF NOT EXISTS idx_outreach_sequences_status ON outreach_sequences(status)',
 				'CREATE INDEX IF NOT EXISTS idx_outreach_sequences_next_action_date ON outreach_sequences(next_action_date)',
-				'CREATE INDEX IF NOT EXISTS idx_analytics_date ON analytics(date DESC)',
-			];
+			'CREATE INDEX IF NOT EXISTS idx_analytics_date ON analytics(date DESC)',
+			'CREATE INDEX IF NOT EXISTS idx_leads_source ON leads(source)',
+		];
 
-			for (const index of indexes) {
-				await sqlite.execute(index);
-			}
+		for (const index of indexes) {
+			await sqlite.execute(index);
+		}
+
+		// Crear tabla search_jobs si no existe
+		await sqlite.execute(`
+			CREATE TABLE IF NOT EXISTS search_jobs (
+				id TEXT PRIMARY KEY,
+				query TEXT NOT NULL,
+				locations TEXT NOT NULL,
+				sources TEXT NOT NULL,
+				frequency TEXT NOT NULL CHECK (frequency IN ('daily', 'weekly', 'monthly')),
+				status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused')),
+				last_run TEXT,
+				next_run TEXT,
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+			)
+		`);
+
+		// Agregar columnas source y source_data a leads si no existen (migración)
+		try {
+			await sqlite.execute('ALTER TABLE leads ADD COLUMN source TEXT');
+		} catch (e) {
+			// Columna ya existe, ignorar
+		}
+		try {
+			await sqlite.execute('ALTER TABLE leads ADD COLUMN source_data TEXT');
+		} catch (e) {
+			// Columna ya existe, ignorar
+		}
 
 			// Habilitar foreign keys
 			await sqlite.execute('PRAGMA foreign_keys = ON');

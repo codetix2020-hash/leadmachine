@@ -23,6 +23,8 @@ export const leads = sqliteTable('leads', {
 	employee_count: integer('employee_count'),
 	problem_detected: text('problem_detected'),
 	insight: text('insight'),
+	source: text('source'), // 'google', 'instagram', 'linkedin', 'facebook', 'yelp'
+	sourceData: text('source_data'), // JSON con data específica de fuente
 	created_at: text('created_at')
 		.default(sql`CURRENT_TIMESTAMP`)
 		.notNull(),
@@ -86,6 +88,30 @@ export const analytics = sqliteTable('analytics', {
 		.notNull(),
 });
 
+// Tabla de trabajos de búsqueda automática
+export const searchJobs = sqliteTable('search_jobs', {
+	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+	query: text('query').notNull(),
+	locations: text('locations').notNull(), // JSON array
+	sources: text('sources').notNull(), // JSON array
+	frequency: text('frequency', {
+		enum: ['daily', 'weekly', 'monthly'],
+	}).notNull(),
+	status: text('status', {
+		enum: ['active', 'paused'],
+	})
+		.default('active')
+		.notNull(),
+	lastRun: text('last_run'), // timestamp
+	nextRun: text('next_run'), // timestamp
+	created_at: text('created_at')
+		.default(sql`CURRENT_TIMESTAMP`)
+		.notNull(),
+	updated_at: text('updated_at')
+		.default(sql`CURRENT_TIMESTAMP`)
+		.notNull(),
+});
+
 // Tipos inferidos
 export type Lead = typeof leads.$inferSelect;
 export type NewLead = typeof leads.$inferInsert;
@@ -95,4 +121,6 @@ export type OutreachSequence = typeof outreachSequences.$inferSelect;
 export type NewOutreachSequence = typeof outreachSequences.$inferInsert;
 export type Analytic = typeof analytics.$inferSelect;
 export type NewAnalytic = typeof analytics.$inferInsert;
+export type SearchJob = typeof searchJobs.$inferSelect;
+export type NewSearchJob = typeof searchJobs.$inferInsert;
 
