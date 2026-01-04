@@ -35,21 +35,27 @@ export default function LeadsPage() {
 
 			const response = await fetch(`/api/leads?${params.toString()}`)
 			
-			if (!response.ok) {
-				throw new Error(`Error ${response.status}: ${response.statusText}`)
+			// Intentar parsear JSON siempre
+			let result;
+			try {
+				result = await response.json();
+			} catch (jsonError) {
+				console.error('Error parsing JSON response:', jsonError);
+				throw new Error(`Error ${response.status}: Respuesta inválida del servidor`);
 			}
 			
-			const result = await response.json()
-			
-			// La API devuelve { leads: [...], pagination: {...} }
-			if (result.error) {
-				console.error('Error de Supabase:', result.error)
-				// Mostrar leads vacío si hay error, pero no bloquear
-				setLeads([])
+			// Si hay error pero la API devolvió estructura válida, usar array vacío
+			if (!response.ok) {
+				console.error('API error:', result.error || result.details);
+				// Usar leads del response si están disponibles (aunque haya error)
+				setLeads(result.leads || []);
+			} else if (result.error) {
+				console.error('Error en respuesta:', result.error);
+				setLeads(result.leads || []);
 			} else if (result.leads) {
-				setLeads(result.leads)
+				setLeads(result.leads);
 			} else {
-				setLeads([])
+				setLeads([]);
 			}
 		} catch (error) {
 			console.error('Error fetching leads:', error)

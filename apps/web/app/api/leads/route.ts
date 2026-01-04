@@ -50,7 +50,8 @@ export async function GET(request: NextRequest) {
 			conditions.push(eq(leads.industry, industry));
 		}
 
-		// Obtener total para paginación (usar countAllRows para mejor compatibilidad)
+		// Obtener total para paginación
+		// Primero obtener todos los leads que cumplen condiciones
 		const allLeads = await db
 			.select()
 			.from(leads)
@@ -58,15 +59,17 @@ export async function GET(request: NextRequest) {
 		
 		const total = allLeads.length;
 
-		// Obtener leads paginados
-		const allData = await db
-			.select()
-			.from(leads)
-			.where(and(...conditions))
-			.orderBy(desc(leads.score), desc(leads.created_at));
-		
-		// Aplicar paginación manualmente (drizzle libsql puede tener problemas con limit/offset)
-		const data = allData.slice(offset, offset + limit);
+		// Obtener leads paginados (usar los que ya obtuvimos para count)
+		const data = allLeads
+			.sort((a, b) => {
+				// Ordenar por score descendente, luego por created_at
+				if (b.score !== a.score) {
+					return b.score - a.score;
+				}
+				// Si score es igual, ordenar por fecha
+				return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+			})
+			.slice(offset, offset + limit);
 
 		return NextResponse.json({
 			leads: data || [],
@@ -79,7 +82,21 @@ export async function GET(request: NextRequest) {
 		});
 	} catch (error) {
 		console.error('Error en GET /api/leads:', error);
-		return NextResponse.json({ error: 'Error obteniendo leads' }, { status: 500 });
+		console.error('Error details:', error instanceof Error ? error.stack : error);
+		return NextResponse.json(
+			{ 
+				error: 'Error obteniendo leads',
+				details: error instanceof Error ? error.message : 'Unknown error',
+				leads: [], // Devolver array vacío para que UI no se rompa
+				pagination: {
+					total: 0,
+					page: 1,
+					limit: 50,
+					totalPages: 0,
+				}
+			}, 
+			{ status: 500 }
+		);
 	}
 }
 
