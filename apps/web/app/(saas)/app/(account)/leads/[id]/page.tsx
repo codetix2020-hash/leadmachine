@@ -1,360 +1,341 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@ui/components/button';
-import { PageHeader } from '@saas/shared/components/PageHeader';
+import { Button } from '@/modules/ui/components/button';
+import { Card } from '@/modules/ui/components/card';
+import { useRouter } from 'next/navigation';
 
-export default function LeadDetailPage() {
-	const params = useParams();
-	const router = useRouter();
+export default function LeadDetailPage({ params }: { params: { id: string } }) {
 	const [lead, setLead] = useState<any>(null);
 	const [enrichment, setEnrichment] = useState<any>(null);
-	const [loading, setLoading] = useState(true);
 	const [enriching, setEnriching] = useState(false);
+	const [loading, setLoading] = useState(true);
+	const router = useRouter();
 
 	useEffect(() => {
 		fetchLead();
 	}, [params.id]);
 
-	const fetchLead = async () => {
+	async function fetchLead() {
 		try {
-			const response = await fetch(`/api/leads?id=${params.id}`);
-			const result = await response.json();
-			if (result.leads && result.leads.length > 0) {
-				const leadData = result.leads[0];
-				setLead(leadData);
+			const res = await fetch(`/api/leads/${params.id}`);
+			if (!res.ok) throw new Error('Failed to fetch lead');
+			const data = await res.json();
 
-				// Si tiene enrichment data, parsearlo
-				if (leadData.enrichmentData) {
+			if (data.lead) {
+				setLead(data.lead);
+
+				// Si ya tiene enrichment, mostrarlo
+				if (data.lead.enrichmentData || data.lead.enrichment_data) {
 					try {
-						setEnrichment(JSON.parse(leadData.enrichmentData));
+						setEnrichment(JSON.parse(data.lead.enrichmentData || data.lead.enrichment_data));
 					} catch (e) {
-						console.error('Error parsing enrichment data:', e);
+						console.error('Error parsing enrichment:', e);
 					}
 				}
 			}
 		} catch (error) {
-			console.error('Error fetching lead:', error);
+			console.error('Error loading lead:', error);
 		} finally {
 			setLoading(false);
 		}
-	};
+	}
 
-	const runDeepEnrichment = async () => {
+	async function runEnrichment() {
 		setEnriching(true);
 		try {
-			const res = await fetch(`/api/leads/${params.id}/enrich-deep`, {
+			const res = await fetch(`/api/leads/${params.id}/enrich`, {
 				method: 'POST',
 			});
-			const data = await res.json();
-			if (data.success) {
-				setEnrichment(data.enrichment);
-				// Recargar lead para obtener score actualizado
-				fetchLead();
-			} else {
-				alert(`Error: ${data.error}`);
+
+			if (!res.ok) {
+				const errorData = await res.json();
+				throw new Error(errorData.error || 'Enrichment failed');
 			}
+
+			const data = await res.json();
+			setEnrichment(data.enrichment);
+
+			// Actualizar lead localmente
+			if (data.enrichment?.predictiveScores) {
+				setLead((prev: any) => ({
+					...prev,
+					score: data.enrichment.predictiveScores.closeProbability || prev.score,
+					enrichmentData: JSON.stringify(data.enrichment),
+				}));
+			}
+
+			alert('✅ Análisis profundo completado!');
 		} catch (error) {
-			console.error('Error enriching lead:', error);
-			alert('Error al realizar análisis profundo');
+			console.error('Enrichment error:', error);
+			alert(`Error al analizar: ${error instanceof Error ? error.message : 'Unknown error'}`);
 		} finally {
 			setEnriching(false);
 		}
-	};
+	}
 
 	if (loading) {
 		return (
-			<div className="p-8">
-				<div className="text-center">Cargando...</div>
+			<div className="p-8 text-center">
+				<div className="text-gray-500">Cargando lead...</div>
 			</div>
 		);
 	}
 
 	if (!lead) {
 		return (
-			<div className="p-8">
-				<div className="text-center">Lead no encontrado</div>
+			<div className="p-8 text-center">
+				<div className="text-red-500 mb-4">Lead no encontrado</div>
+				<Button onClick={() => router.push('/app/leads')}>Volver a Leads</Button>
 			</div>
 		);
 	}
 
 	return (
-		<div className="space-y-8 p-8">
-			<div className="flex justify-between items-center">
-				<PageHeader
-					title={lead.company_name}
-					subtitle={lead.location || 'Sin ubicación'}
-				/>
-				<Button onClick={runDeepEnrichment} disabled={enriching}>
-					{enriching ? '🔍 Analizando...' : '🔍 Análisis Profundo'}
-				</Button>
+		<div className="p-8 max-w-6xl mx-auto">
+			{/* Header */}
+			<div className="flex justify-between items-start mb-8">
+				<div>
+					<h1 className="text-3xl font-bold mb-2">{lead.company_name}</h1>
+					<p className="text-gray-600">{lead.location}</p>
+					{lead.industry && <p className="text-sm text-gray-500 mt-1">Industria: {lead.industry}</p>}
+				</div>
+				<div className="flex gap-3">
+					<Button variant="outline" onClick={() => router.push('/app/leads')}>
+						← Volver
+					</Button>
+					<Button onClick={runEnrichment} disabled={enriching} size="lg">
+						{enriching ? '⏳ Analizando (15-20seg)...' : '🔍 Análisis Profundo'}
+					</Button>
+				</div>
 			</div>
 
-			{/* Scores Predictivos */}
-			{enrichment?.predictiveScores && (
-				<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-					<div className="rounded-lg border bg-card p-6">
-						<div className="text-sm font-medium text-muted-foreground">
-							Probabilidad de Cierre
-						</div>
-						<div className="mt-2 text-3xl font-bold text-green-600">
-							{enrichment.predictiveScores.closeProbability}%
-						</div>
+			{/* Información básica */}
+			<Card className="p-6 mb-6">
+				<h2 className="text-xl font-bold mb-4">📋 Información Básica</h2>
+				<div className="grid grid-cols-2 gap-4">
+					<div>
+						<strong>Score:</strong> <span className="text-2xl font-bold text-green-600">{lead.score}/100</span>
 					</div>
-
-					<div className="rounded-lg border bg-card p-6">
-						<div className="text-sm font-medium text-muted-foreground">
-							Deal Estimado
-						</div>
-						<div className="mt-2 text-3xl font-bold">
-							€{enrichment.predictiveScores.estimatedDealSize?.toLocaleString() ||
-								'N/A'}
-						</div>
+					<div>
+						<strong>Estado:</strong> <span className="capitalize">{lead.status}</span>
 					</div>
-
-					<div className="rounded-lg border bg-card p-6">
-						<div className="text-sm font-medium text-muted-foreground">
-							Días para Cerrar
-						</div>
-						<div className="mt-2 text-3xl font-bold">
-							{enrichment.predictiveScores.daysToClose || 'N/A'}
-						</div>
-					</div>
-
-					<div className="rounded-lg border bg-card p-6">
-						<div className="text-sm font-medium text-muted-foreground">
-							Prioridad
-						</div>
-						<div className="mt-2 text-2xl font-bold uppercase">
-							{enrichment.recommendations?.priority || 'medium'}
-						</div>
-					</div>
-				</div>
-			)}
-
-			{/* Recomendaciones */}
-			{enrichment?.recommendations && (
-				<div className="rounded-lg border bg-card p-6">
-					<h2 className="text-xl font-bold mb-4">🎯 Estrategia de Contacto</h2>
-					<div className="space-y-4">
+					{lead.email && (
 						<div>
-							<strong>Mejor Approach:</strong>
-							<p className="text-muted-foreground mt-1">
-								{enrichment.recommendations.bestApproach}
-							</p>
+							<strong>Email:</strong> <a href={`mailto:${lead.email}`} className="text-primary hover:underline">{lead.email}</a>
 						</div>
-
+					)}
+					{lead.phone && (
 						<div>
-							<strong>Key Talking Points:</strong>
-							<ul className="list-disc list-inside mt-1 space-y-1">
-								{enrichment.recommendations.keyTalkingPoints?.map(
-									(point: string, i: number) => (
-										<li key={i} className="text-muted-foreground">
-											{point}
-										</li>
-									)
-								)}
-							</ul>
+							<strong>Teléfono:</strong> <a href={`tel:${lead.phone}`} className="text-primary hover:underline">{lead.phone}</a>
 						</div>
-
-						<div>
-							<strong>Timing:</strong>
-							<p className="text-muted-foreground mt-1">
-								{enrichment.recommendations.bestTiming}
-							</p>
-						</div>
-
-						{enrichment.recommendations.objectionsPredicted &&
-							enrichment.recommendations.objectionsPredicted.length > 0 && (
-								<div>
-									<strong>Objeciones Predecibles:</strong>
-									<ul className="list-disc list-inside mt-1 space-y-1">
-										{enrichment.recommendations.objectionsPredicted.map(
-											(obj: string, i: number) => (
-												<li key={i} className="text-muted-foreground">
-													{obj}
-												</li>
-											)
-										)}
-									</ul>
-								</div>
-							)}
-					</div>
-				</div>
-			)}
-
-			{/* Website Analysis */}
-			{enrichment?.website && enrichment.website.hasWebsite && (
-				<div className="rounded-lg border bg-card p-6">
-					<h2 className="text-xl font-bold mb-4">🌐 Análisis Website</h2>
-					<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-						<div>
-							<strong>Calidad:</strong>
-							<div className="text-muted-foreground capitalize">
-								{enrichment.website.quality}
-							</div>
-						</div>
-						<div>
-							<strong>Diseño:</strong>
-							<div className="text-muted-foreground capitalize">
-								{enrichment.website.design}
-							</div>
-						</div>
-						<div>
-							<strong>SEO Score:</strong>
-							<div className="text-muted-foreground">
-								{enrichment.website.seoScore}/100
-							</div>
-						</div>
-						<div>
-							<strong>Booking System:</strong>
-							<div className="text-muted-foreground">
-								{enrichment.website.hasBookingSystem ? '✅ Sí' : '❌ No'}
-							</div>
-						</div>
-					</div>
-
-					{enrichment.website.problems &&
-						enrichment.website.problems.length > 0 && (
-							<div className="mt-4">
-								<strong>Problemas Detectados:</strong>
-								<ul className="list-disc list-inside mt-1 space-y-1">
-									{enrichment.website.problems.map(
-										(problem: string, i: number) => (
-											<li key={i} className="text-red-600">
-												{problem}
-											</li>
-										)
-									)}
-								</ul>
-							</div>
-						)}
-				</div>
-			)}
-
-			{/* Reviews */}
-			{enrichment?.reviews && (
-				<div className="rounded-lg border bg-card p-6">
-					<h2 className="text-xl font-bold mb-4">⭐ Análisis de Reviews</h2>
-					<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-						<div>
-							<strong>Rating Promedio:</strong>
-							<div className="text-muted-foreground">
-								{enrichment.reviews.averageRating?.toFixed(1)}/5
-							</div>
-						</div>
-						<div>
-							<strong>Total Reviews:</strong>
-							<div className="text-muted-foreground">
-								{enrichment.reviews.totalReviews}
-							</div>
-						</div>
-						<div>
-							<strong>Sentiment:</strong>
-							<div className="text-muted-foreground capitalize">
-								{enrichment.reviews.sentiment?.replace('_', ' ')}
-							</div>
-						</div>
-						<div>
-							<strong>Tendencia:</strong>
-							<div className="text-muted-foreground capitalize">
-								{enrichment.reviews.recentTrend}
-							</div>
-						</div>
-					</div>
-
-					{enrichment.reviews.commonComplaints &&
-						enrichment.reviews.commonComplaints.length > 0 && (
-							<div className="mt-4">
-								<strong>Quejas Comunes:</strong>
-								<ul className="list-disc list-inside mt-1 space-y-1">
-									{enrichment.reviews.commonComplaints.map(
-										(complaint: any, i: number) => (
-											<li key={i} className="text-muted-foreground">
-												{complaint.issue} ({complaint.count} veces)
-											</li>
-										)
-									)}
-								</ul>
-							</div>
-						)}
-				</div>
-			)}
-
-			{/* Contacts */}
-			{enrichment?.contacts && (
-				<div className="rounded-lg border bg-card p-6">
-					<h2 className="text-xl font-bold mb-4">👤 Información de Contacto</h2>
-					{enrichment.contacts.decisionMaker ? (
-						<div className="space-y-2">
-							<div>
-								<strong>Decision Maker:</strong>
-								<div className="text-muted-foreground">
-									{enrichment.contacts.decisionMaker.name} -{' '}
-									{enrichment.contacts.decisionMaker.title}
-								</div>
-							</div>
-							{enrichment.contacts.decisionMaker.email && (
-								<div>
-									<strong>Email:</strong>
-									<div className="text-muted-foreground">
-										{enrichment.contacts.decisionMaker.email}
-									</div>
-								</div>
-							)}
-							{enrichment.contacts.decisionMaker.linkedinUrl && (
-								<div>
-									<strong>LinkedIn:</strong>
-									<a
-										href={enrichment.contacts.decisionMaker.linkedinUrl}
-										target="_blank"
-										rel="noopener noreferrer"
-										className="text-primary hover:underline"
-									>
-										Ver perfil
-									</a>
-								</div>
-							)}
-						</div>
-					) : (
-						<div className="space-y-2">
-							{enrichment.contacts.genericEmails &&
-								enrichment.contacts.genericEmails.length > 0 && (
-									<div>
-										<strong>Emails:</strong>
-										<div className="text-muted-foreground">
-											{enrichment.contacts.genericEmails.join(', ')}
-										</div>
-									</div>
-								)}
-							{enrichment.contacts.phones &&
-								enrichment.contacts.phones.length > 0 && (
-									<div>
-										<strong>Teléfonos:</strong>
-										<div className="text-muted-foreground">
-											{enrichment.contacts.phones.join(', ')}
-										</div>
-									</div>
-								)}
-							<div>
-								<strong>Mejor Método:</strong>
-								<div className="text-muted-foreground capitalize">
-									{enrichment.contacts.bestContactMethod}
-								</div>
-							</div>
+					)}
+					{lead.website && (
+						<div className="col-span-2">
+							<strong>Website:</strong>{' '}
+							<a href={lead.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+								{lead.website}
+							</a>
 						</div>
 					)}
 				</div>
+			</Card>
+
+			{enrichment && (
+				<>
+					{/* Producto Recomendado */}
+					{enrichment.recommendedProduct && (
+						<Card className="p-6 mb-6 bg-blue-50 border-blue-200">
+							<h2 className="text-2xl font-bold mb-2">🎯 Producto Recomendado</h2>
+							<div className="text-3xl font-bold text-blue-600 uppercase mb-2">{enrichment.recommendedProduct}</div>
+							<p className="text-gray-700">{enrichment.productReasoning}</p>
+						</Card>
+					)}
+
+					{/* Scores Predictivos */}
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+						<Card className="p-6">
+							<div className="text-sm text-gray-500 mb-2">Probabilidad de Cierre</div>
+							<div className="text-4xl font-bold text-green-600">
+								{enrichment.predictiveScores?.closeProbability || 0}%
+							</div>
+						</Card>
+
+						<Card className="p-6">
+							<div className="text-sm text-gray-500 mb-2">Deal Estimado</div>
+							<div className="text-4xl font-bold">€{enrichment.predictiveScores?.estimatedDealSize || 0}</div>
+						</Card>
+
+						<Card className="p-6">
+							<div className="text-sm text-gray-500 mb-2">Días para Cerrar</div>
+							<div className="text-4xl font-bold">{enrichment.predictiveScores?.daysToClose || 0}</div>
+						</Card>
+					</div>
+
+					{/* Estrategia */}
+					<Card className="p-6 mb-6">
+						<h2 className="text-2xl font-bold mb-4">🎯 Estrategia de Contacto</h2>
+						<div className="space-y-4">
+							<div>
+								<strong className="text-lg">Prioridad:</strong>
+								<span className="ml-2 text-2xl uppercase font-bold text-orange-600">
+									{enrichment.recommendations?.priority || 'medium'}
+								</span>
+							</div>
+
+							<div>
+								<strong>Mejor Approach:</strong>
+								<p className="text-gray-700 mt-2">{enrichment.recommendations?.bestApproach}</p>
+							</div>
+
+							<div>
+								<strong>Key Talking Points:</strong>
+								<ul className="list-disc list-inside mt-2 space-y-1">
+									{enrichment.recommendations?.keyTalkingPoints?.map((point: string, i: number) => (
+										<li key={i} className="text-gray-700">
+											{point}
+										</li>
+									))}
+								</ul>
+							</div>
+
+							<div>
+								<strong>Pitch Angle:</strong>
+								<p className="text-gray-700 mt-2">{enrichment.recommendations?.pitchAngle}</p>
+							</div>
+
+							<div>
+								<strong>Timing:</strong>
+								<p className="text-gray-700 mt-2">{enrichment.recommendations?.bestTiming}</p>
+							</div>
+
+							{enrichment.recommendations?.expectedObjections && (
+								<div>
+									<strong>Objeciones Esperadas:</strong>
+									<ul className="list-disc list-inside mt-2 space-y-1">
+										{enrichment.recommendations.expectedObjections.map((obj: string, i: number) => (
+											<li key={i} className="text-gray-700">
+												{obj}
+											</li>
+										))}
+									</ul>
+								</div>
+							)}
+						</div>
+					</Card>
+
+					{/* Website Analysis */}
+					{enrichment.website && (
+						<Card className="p-6 mb-6">
+							<h2 className="text-2xl font-bold mb-4">🌐 Análisis Website</h2>
+							<div className="grid grid-cols-2 gap-4 mb-4">
+								<div>
+									<strong>Calidad:</strong> <span className="capitalize">{enrichment.website.quality}</span>
+								</div>
+								<div>
+									<strong>Diseño:</strong> <span className="capitalize">{enrichment.website.design}</span>
+								</div>
+								<div>
+									<strong>Sistema de Reservas:</strong>{' '}
+									{enrichment.website.hasBookingSystem ? '✅ Sí' : '❌ No'}
+								</div>
+								<div>
+									<strong>E-commerce:</strong> {enrichment.website.hasEcommerce ? '✅ Sí' : '❌ No'}
+								</div>
+								<div>
+									<strong>Optimizado Móvil:</strong> {enrichment.website.mobileOptimized ? '✅ Sí' : '❌ No'}
+								</div>
+								{enrichment.website.techStack && enrichment.website.techStack.length > 0 && (
+									<div>
+										<strong>Tech Stack:</strong> {enrichment.website.techStack.join(', ')}
+									</div>
+								)}
+							</div>
+
+							{enrichment.website.problems?.length > 0 && (
+								<div className="mt-4">
+									<strong>Problemas Detectados:</strong>
+									<ul className="list-disc list-inside mt-2">
+										{enrichment.website.problems.map((p: string, i: number) => (
+											<li key={i} className="text-red-600">
+												{p}
+											</li>
+										))}
+									</ul>
+								</div>
+							)}
+
+							{enrichment.website.opportunities?.length > 0 && (
+								<div className="mt-4">
+									<strong>Oportunidades:</strong>
+									<ul className="list-disc list-inside mt-2">
+										{enrichment.website.opportunities.map((o: string, i: number) => (
+											<li key={i} className="text-green-600">
+												{o}
+											</li>
+										))}
+									</ul>
+								</div>
+							)}
+						</Card>
+					)}
+
+					{/* Reviews */}
+					{enrichment.reviews && enrichment.reviews.totalReviews > 0 && (
+						<Card className="p-6">
+							<h2 className="text-2xl font-bold mb-4">⭐ Análisis de Reviews</h2>
+							<div className="grid grid-cols-2 gap-4 mb-4">
+								<div>
+									<strong>Rating Promedio:</strong> {enrichment.reviews.averageRating}/5 ⭐
+								</div>
+								<div>
+									<strong>Total Reviews:</strong> {enrichment.reviews.totalReviews}
+								</div>
+								<div>
+									<strong>Sentiment:</strong> <span className="capitalize">{enrichment.reviews.sentiment}</span>
+								</div>
+							</div>
+
+							{enrichment.reviews.commonComplaints?.length > 0 && (
+								<div className="mt-4">
+									<strong>Quejas Comunes:</strong>
+									<ul className="list-disc list-inside mt-2">
+										{enrichment.reviews.commonComplaints.map((c: any, i: number) => (
+											<li key={i}>
+												{c.issue} <span className="text-gray-500">({c.count}x)</span>
+											</li>
+										))}
+									</ul>
+								</div>
+							)}
+
+							{enrichment.reviews.painPoints?.length > 0 && (
+								<div className="mt-4">
+									<strong>Pain Points (Software puede resolver):</strong>
+									<ul className="list-disc list-inside mt-2">
+										{enrichment.reviews.painPoints.map((p: string, i: number) => (
+											<li key={i} className="text-orange-600 font-medium">
+												{p}
+											</li>
+										))}
+									</ul>
+								</div>
+							)}
+						</Card>
+					)}
+				</>
 			)}
 
-			{/* Botón volver */}
-			<div>
-				<Button variant="outline" onClick={() => router.push('/app/leads')}>
-					← Volver a Leads
-				</Button>
-			</div>
+			{!enrichment && (
+				<Card className="p-12 text-center">
+					<p className="text-gray-500 mb-4 text-lg">
+						Haz click en "🔍 Análisis Profundo" para ver predicciones y estrategia personalizada.
+					</p>
+					<p className="text-sm text-gray-400">
+						El análisis tarda 15-20 segundos y genera recomendaciones inteligentes basadas en el website y reviews.
+					</p>
+				</Card>
+			)}
 		</div>
 	);
 }
-

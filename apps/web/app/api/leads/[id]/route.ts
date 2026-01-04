@@ -1,31 +1,26 @@
-/**
- * API Endpoint: Obtener Lead por ID
- * GET /api/leads/[id]
- */
-
 import { NextRequest, NextResponse } from 'next/server';
-import { db, initializeDatabase } from '@/lib/db/client';
-import { leads } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { initializeDatabase } from '@/lib/db/client';
 
-export async function GET(
-	request: NextRequest,
-	{ params }: { params: Promise<{ id: string }> }
-) {
-	await initializeDatabase();
+/**
+ * GET - Obtener un lead por ID
+ */
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
 	try {
-		const { id } = await params;
+		await initializeDatabase();
 
-		const [lead] = await db.select().from(leads).where(eq(leads.id, id));
+		const { db } = await import('@/lib/db/client');
+		const { leads } = await import('@/lib/db/schema');
+		const { eq } = await import('drizzle-orm');
+
+		const [lead] = await db.select().from(leads).where(eq(leads.id, params.id));
 
 		if (!lead) {
 			return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
 		}
 
 		return NextResponse.json({ lead });
-	} catch (error) {
-		console.error('Error en GET /api/leads/[id]:', error);
-		return NextResponse.json({ error: 'Error obteniendo lead' }, { status: 500 });
+	} catch (error: any) {
+		console.error('Error in GET /api/leads/[id]:', error);
+		return NextResponse.json({ error: error.message || 'Error obteniendo lead' }, { status: 500 });
 	}
 }
-

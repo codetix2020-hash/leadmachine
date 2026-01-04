@@ -1,247 +1,120 @@
-/**
- * Master Enricher
- * Orquesta todos los analizadores y genera análisis completo con IA
- */
-
 import { analyzeWebsite } from './analyzers/website-analyzer';
-import { analyzeSocialMedia } from './analyzers/social-analyzer';
-import { analyzeCompetitors } from './analyzers/competitor-analyzer';
 import { analyzeReviews } from './analyzers/review-analyzer';
-import { detectGrowthSignals } from './analyzers/growth-signals';
-import { findContacts } from './analyzers/contact-finder';
 import Anthropic from '@anthropic-ai/sdk';
 
-export interface DeepEnrichment {
-	// Análisis básico (existente)
-	basicScore: number;
-	basicProblem: string;
-	basicInsight: string;
+export async function deepEnrichLead(lead: any) {
+	console.log(`🔍 Deep enriching: ${lead.company_name || lead.companyName}`);
 
-	// Análisis profundo
-	website?: any;
-	social?: any;
-	competitors?: any;
-	reviews?: any;
-	growthSignals?: any;
-	contacts?: any;
+	// 1. Análisis de website
+	let websiteAnalysis = null;
+	if (lead.website) {
+		websiteAnalysis = await analyzeWebsite(lead.website);
+	}
 
-	// Scores predictivos
-	predictiveScores: {
-		closeProbability: number;
-		estimatedDealSize: number;
-		daysToClose: number;
-		churnRisk: number;
-	};
+	// 2. Análisis de reviews
+	let reviewAnalysis = null;
+	if (lead.sourceData || lead.source_data) {
+		try {
+			const sourceData = JSON.parse(lead.sourceData || lead.source_data || '{}');
+			if (sourceData.reviews) {
+				reviewAnalysis = await analyzeReviews(sourceData.reviews);
+			}
+		} catch (e) {
+			console.error('Error parsing source data:', e);
+		}
+	}
 
-	// Recomendaciones
-	recommendations: {
-		priority: 'low' | 'medium' | 'high' | 'urgent';
-		bestApproach: string;
-		keyTalkingPoints: string[];
-		objectionsPredicted: string[];
-		bestTiming: string;
-	};
-}
+	// 3. Claude genera análisis maestro (detecta qué vender)
+	const masterAnalysis = await generateMasterAnalysis({
+		lead,
+		website: websiteAnalysis,
+		reviews: reviewAnalysis,
+	});
 
-export async function deepEnrichLead(lead: any): Promise<DeepEnrichment> {
-	console.log(`🔍 Deep enriching: ${lead.company_name || lead.name}`);
-
-	// Ejecutar todos los análisis en paralelo
-	const [
-		website,
-		social,
-		competitors,
-		reviews,
-		growthSignals,
-		contacts,
-	] = await Promise.allSettled([
-		lead.website ? analyzeWebsite(lead.website) : Promise.resolve(null),
-		analyzeSocialMedia({
-			name: lead.company_name || lead.name,
-			instagram: lead.instagram_url,
-			facebook: undefined,
-			linkedin: lead.linkedin_url,
-		}),
-		analyzeCompetitors({
-			name: lead.company_name || lead.name,
-			location: lead.location || '',
-			industry: lead.industry,
-		}),
-		analyzeReviews({
-			name: lead.company_name || lead.name,
-			rating: undefined,
-			reviewCount: undefined,
-		}),
-		detectGrowthSignals({
-			name: lead.company_name || lead.name,
-			website: lead.website,
-			linkedin: lead.linkedin_url,
-			instagram: lead.instagram_url,
-		}),
-		findContacts({
-			name: lead.company_name || lead.name,
-			website: lead.website,
-			linkedin: lead.linkedin_url,
-			email: lead.email,
-			phone: lead.phone,
-		}),
-	]);
-
-	// Preparar datos para análisis maestro
-	const analysisData = {
-		lead: {
-			name: lead.company_name || lead.name,
-			location: lead.location,
-			industry: lead.industry,
-			type: lead.type,
-			score: lead.score,
-			problem: lead.problem_detected,
-			insight: lead.insight,
-		},
-		website: website.status === 'fulfilled' ? website.value : null,
-		social: social.status === 'fulfilled' ? social.value : null,
-		competitors: competitors.status === 'fulfilled' ? competitors.value : null,
-		reviews: reviews.status === 'fulfilled' ? reviews.value : null,
-		growthSignals:
-			growthSignals.status === 'fulfilled' ? growthSignals.value : null,
-		contacts: contacts.status === 'fulfilled' ? contacts.value : null,
-	};
-
-	// Generar análisis maestro con Claude
-	const masterAnalysis = await generateMasterAnalysis(analysisData);
-
-	return {
-		basicScore: lead.score || 0,
-		basicProblem: lead.problem_detected || '',
-		basicInsight: lead.insight || '',
-		website: analysisData.website,
-		social: analysisData.social,
-		competitors: analysisData.competitors,
-		reviews: analysisData.reviews,
-		growthSignals: analysisData.growthSignals,
-		contacts: analysisData.contacts,
-		...masterAnalysis,
-	};
+	return masterAnalysis;
 }
 
 async function generateMasterAnalysis(data: any) {
 	const claude = new Anthropic({
-		apiKey: process.env.ANTHROPIC_API_KEY!,
+		apiKey: process.env.ANTHROPIC_API_KEY,
 	});
+
+	const lead = data.lead;
 
 	const response = await claude.messages.create({
 		model: 'claude-sonnet-4-20250514',
-		max_tokens: 4000,
+		max_tokens: 3000,
 		messages: [
 			{
 				role: 'user',
-				content: `Eres un experto en ventas B2B. Analiza este lead completamente:
+				content: `Eres experto en ventas de software B2B. Analiza este lead y determina QUÉ VENDERLE:
 
 LEAD INFO:
-${JSON.stringify(data.lead)}
+- Nombre: ${lead.company_name || lead.companyName || 'Desconocido'}
+- Industria: ${lead.industry || 'No especificada'}
+- Ubicación: ${lead.location || 'No especificada'}
+- Tipo asignado: ${lead.type || 'reservaspro'}
 
 ANÁLISIS WEBSITE:
-${JSON.stringify(data.website)}
+${JSON.stringify(data.website, null, 2)}
 
-ANÁLISIS SOCIAL:
-${JSON.stringify(data.social)}
+ANÁLISIS REVIEWS:
+${JSON.stringify(data.reviews, null, 2)}
 
-COMPETIDORES:
-${JSON.stringify(data.competitors)}
+PRODUCTOS DISPONIBLES:
+1. **ReservasPro** (€79-149/mes): Sistema de reservas para negocios locales (barberías, clínicas, spas, restaurantes)
+2. **CodeTix** (€10k-30k): Desarrollo custom de apps, SaaS, marketplaces para startups/empresas
 
-REVIEWS:
-${JSON.stringify(data.reviews)}
+TASK:
+1. Determina QUÉ producto venderle (ReservasPro o CodeTix)
+2. Calcula probabilidad de cierre (0-100%)
+3. Estima deal size en EUR
+4. Días estimados para cerrar
+5. Genera estrategia de contacto personalizada
 
-SEÑALES DE CRECIMIENTO:
-${JSON.stringify(data.growthSignals)}
+CRITERIOS:
+- Si es negocio local pequeño (barbería, spa, clínica, restaurante) → ReservasPro
+- Si es startup, empresa tech, e-commerce grande → CodeTix
+- Si necesitan booking/reservas → ReservasPro
+- Si necesitan app custom, marketplace, SaaS → CodeTix
 
-CONTACTOS:
-${JSON.stringify(data.contacts)}
-
-Basándote en TODO esto, genera:
-
-1. PROBABILIDAD DE CIERRE (0-100%):
-   - Considera: necesidad detectada, presupuesto estimado, timing, pain points
-   
-2. TAMAÑO ESTIMADO DEL DEAL (EUR):
-   - Producto: ${data.lead.type === 'codetix' ? 'CodeTix (sistema de citas médicas)' : 'ReservasPro (sistema de reservas restaurantes)'}
-   - Basado en tamaño empresa, industria, ubicación
-   
-3. DÍAS ESTIMADOS PARA CERRAR:
-   - Urgencia detectada
-   - Complejidad de venta
-   
-4. CHURN RISK (0-100):
-   - Probabilidad de que cancelen después de comprar
-   
-5. PRIORIDAD (low/medium/high/urgent):
-   - Combina probabilidad + deal size + timing
-   
-6. MEJOR APPROACH:
-   - Email/LinkedIn/Teléfono
-   - Qué mencionar específicamente
-   - Angle de entrada
-   
-7. KEY TALKING POINTS:
-   - 3-5 puntos clave para el pitch
-   - Basados en sus pain points reales
-   
-8. OBJECIONES PREDECIBLES:
-   - Qué dirán probablemente
-   - Cómo responder
-   
-9. BEST TIMING:
-   - Cuándo contactar
-   - Por qué
-
-Responde SOLO JSON válido, sin markdown:
+Responde SOLO JSON (sin markdown):
 {
+  "recommendedProduct": "reservaspro",
+  "productReasoning": "Negocio local con necesidad clara de sistema de reservas",
   "predictiveScores": {
     "closeProbability": 75,
     "estimatedDealSize": 2400,
-    "daysToClose": 45,
-    "churnRisk": 20
+    "daysToClose": 45
   },
   "recommendations": {
     "priority": "high",
-    "bestApproach": "Email personalizado mencionando que...",
-    "keyTalkingPoints": ["Punto 1", "Punto 2", "Punto 3"],
-    "objectionsPredicted": ["Muy caro", "Ya tenemos algo"],
-    "bestTiming": "Esta semana - están contratando"
+    "bestApproach": "Email personalizado mencionando problema específico detectado en reviews",
+    "keyTalkingPoints": [
+      "8 clientes mencionan dificultad para reservar cita",
+      "Competencia ya tiene sistema online",
+      "ROI: Reducir no-shows 40% = €500/mes adicionales"
+    ],
+    "pitchAngle": "Sistema que resuelve X problema detectado en reviews",
+    "bestTiming": "Esta semana - alta actividad detectada",
+    "expectedObjections": [
+      "Precio - Respuesta: Se paga solo reduciendo no-shows",
+      "Ya tenemos agenda papel - Respuesta: Clientes prefieren online"
+    ]
   }
 }`,
 			},
 		],
 	});
 
-	try {
-		const analysis = JSON.parse(
-			response.content[0].type === 'text'
-				? response.content[0].text
-				: JSON.stringify(response.content[0])
-		);
-		return analysis;
-	} catch (error) {
-		console.error('Error parsing Claude response:', error);
-		// Retornar valores por defecto
-		return {
-			predictiveScores: {
-				closeProbability: 50,
-				estimatedDealSize: 2000,
-				daysToClose: 60,
-				churnRisk: 30,
-			},
-			recommendations: {
-				priority: 'medium',
-				bestApproach: 'Contactar por email con propuesta personalizada',
-				keyTalkingPoints: [
-					'Solucionar problema detectado',
-					'Mejorar eficiencia operativa',
-				],
-				objectionsPredicted: ['Precio', 'Ya tenemos sistema'],
-				bestTiming: 'Esta semana',
-			},
-		};
-	}
-}
+	const text = response.content[0].type === 'text' ? response.content[0].text : '{}';
 
+	const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+	const analysis = JSON.parse(cleaned);
+
+	return {
+		website: data.website,
+		reviews: data.reviews,
+		...analysis,
+	};
+}
