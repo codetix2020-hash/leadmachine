@@ -5,20 +5,27 @@ import { Button } from '@/modules/ui/components/button';
 import { Card } from '@/modules/ui/components/card';
 import { useRouter } from 'next/navigation';
 
-export default function LeadDetailPage({ params }: { params: { id: string } }) {
+export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
 	const [lead, setLead] = useState<any>(null);
 	const [enrichment, setEnrichment] = useState<any>(null);
 	const [enriching, setEnriching] = useState(false);
 	const [loading, setLoading] = useState(true);
 	const router = useRouter();
+	const [leadId, setLeadId] = useState<string>('');
 
 	useEffect(() => {
-		fetchLead();
-	}, [params.id]);
+		// Resolver params en Next.js 15
+		params.then((resolved) => {
+			setLeadId(resolved.id);
+			fetchLead(resolved.id);
+		});
+	}, [params]);
 
-	async function fetchLead() {
+	async function fetchLead(id: string) {
 		try {
-			const res = await fetch(`/api/leads/${params.id}`);
+			setLoading(true);
+
+			const res = await fetch(`/api/leads/${id}`);
 			if (!res.ok) throw new Error('Failed to fetch lead');
 			const data = await res.json();
 
@@ -42,9 +49,16 @@ export default function LeadDetailPage({ params }: { params: { id: string } }) {
 	}
 
 	async function runEnrichment() {
+		if (!leadId) {
+			const resolved = await params;
+			setLeadId(resolved.id);
+		}
+
 		setEnriching(true);
 		try {
-			const res = await fetch(`/api/leads/${params.id}/enrich`, {
+			const id = leadId || (await params).id;
+
+			const res = await fetch(`/api/leads/${id}/enrich`, {
 				method: 'POST',
 			});
 
