@@ -42,7 +42,7 @@ export async function startOutreachSequence(params: { leadId: string; lead: any;
 async function scheduleFollowUps(params: any) {
 	// Crear entradas en outreach_sequences
 	const { db } = await import('@/lib/db/client');
-	const { outreach_sequences } = await import('@/lib/db/schema');
+	const { outreachSequences } = await import('@/lib/db/schema');
 
 	const followUpDays = [3, 7, 14, 21, 30, 45]; // Días después del inicial
 
@@ -51,13 +51,13 @@ async function scheduleFollowUps(params: any) {
 		const nextDate = new Date();
 		nextDate.setDate(nextDate.getDate() + daysFromNow);
 
-		await db.insert(outreach_sequences).values({
+		await db.insert(outreachSequences).values({
 			id: crypto.randomUUID(),
 			lead_id: params.leadId,
 			sequence_type: 'email',
 			current_step: i + 2, // Steps 2-7
 			next_action_date: nextDate.toISOString(),
-			status: 'active',
+			status: 'active' as const,
 			created_at: new Date().toISOString(),
 			updated_at: new Date().toISOString(),
 		});

@@ -10,15 +10,15 @@ export async function GET() {
 		console.log('⏰ Running outreach cron...');
 
 		const { db } = await import('@/lib/db/client');
-		const { outreach_sequences, leads } = await import('@/lib/db/schema');
+		const { outreachSequences, leads } = await import('@/lib/db/schema');
 		const { eq, and, lte } = await import('drizzle-orm');
 
 		// Buscar follow-ups pendientes
 		const now = new Date().toISOString();
 		const pending = await db
 			.select()
-			.from(outreach_sequences)
-			.where(and(eq(outreach_sequences.status, 'active'), lte(outreach_sequences.next_action_date, now)));
+			.from(outreachSequences)
+			.where(and(eq(outreachSequences.status, 'active'), lte(outreachSequences.next_action_date, now)));
 
 		console.log(`📋 Found ${pending.length} pending follow-ups`);
 
@@ -56,9 +56,9 @@ export async function GET() {
 
 			// Marcar como completado
 			await db
-				.update(outreach_sequences)
+				.update(outreachSequences)
 				.set({ status: 'completed', updated_at: new Date().toISOString() })
-				.where(eq(outreach_sequences.id, sequence.id));
+				.where(eq(outreachSequences.id, sequence.id));
 
 			console.log(`✅ Sent follow-up step ${sequence.current_step} to ${lead.company_name}`);
 		}

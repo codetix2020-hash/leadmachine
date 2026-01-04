@@ -48,12 +48,12 @@ async function logEmailSent(params: any) {
 	const { db } = await import('@/lib/db/client');
 	const { conversations } = await import('@/lib/db/schema');
 
-	await db.insert(conversations).values({
-		id: crypto.randomUUID(),
-		lead_id: params.leadId,
-		channel: 'email',
-		message_sent: params.subject,
-		created_at: new Date().toISOString(),
-	});
+		await db.insert(conversations).values({
+			id: crypto.randomUUID(),
+			lead_id: params.leadId,
+			channel: 'email' as const,
+			message_sent: params.subject,
+			created_at: new Date().toISOString(),
+		});
 }
 
