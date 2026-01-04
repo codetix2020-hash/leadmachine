@@ -9,6 +9,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 	const [lead, setLead] = useState<any>(null);
 	const [enrichment, setEnrichment] = useState<any>(null);
 	const [enriching, setEnriching] = useState(false);
+	const [outreaching, setOutreaching] = useState(false);
 	const [loading, setLoading] = useState(true);
 	const router = useRouter();
 	const [leadId, setLeadId] = useState<string>('');
@@ -88,6 +89,39 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 		}
 	}
 
+	async function startOutreach() {
+		if (!confirm('¿Iniciar secuencia de outreach automático? Se enviará un email inicial y se programarán 6 follow-ups.')) {
+			return;
+		}
+
+		setOutreaching(true);
+		try {
+			const id = leadId || (await params).id;
+
+			const res = await fetch(`/api/leads/${id}/outreach`, {
+				method: 'POST',
+			});
+
+			if (!res.ok) {
+				const errorData = await res.json();
+				throw new Error(errorData.error || 'Outreach failed');
+			}
+
+			const data = await res.json();
+
+			if (data.success) {
+				alert('✅ Email inicial enviado. Follow-ups programados automáticamente.');
+			} else {
+				alert(`❌ Error: ${data.error || 'Unknown error'}`);
+			}
+		} catch (error) {
+			console.error('Error:', error);
+			alert(`Error al iniciar outreach: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		} finally {
+			setOutreaching(false);
+		}
+	}
+
 	if (loading) {
 		return (
 			<div className="p-8 text-center">
@@ -121,6 +155,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 					<Button onClick={runEnrichment} disabled={enriching} size="lg">
 						{enriching ? '⏳ Analizando (15-20seg)...' : '🔍 Análisis Profundo'}
 					</Button>
+					{enrichment && (
+						<Button onClick={startOutreach} disabled={outreaching || !lead.email} size="lg" variant="default">
+							{outreaching ? '📧 Enviando...' : '🚀 Iniciar Outreach'}
+						</Button>
+					)}
 				</div>
 			</div>
 

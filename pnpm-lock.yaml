@@ -252,6 +252,9 @@ importers:
       react-qr-code:
         specifier: ^2.0.17
         version: 2.0.18(react@19.2.3)
+      resend:
+        specifier: ^6.5.2
+        version: 6.5.2(@react-email/render@2.0.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3))
       server-only:
         specifier: ^0.0.1
         version: 0.0.1
