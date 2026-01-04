@@ -33,14 +33,27 @@ export default function LeadsPage() {
 			if (filters.minScore > 0) params.append('minScore', filters.minScore.toString())
 
 			const response = await fetch(`/api/leads?${params.toString()}`)
+			
+			if (!response.ok) {
+				throw new Error(`Error ${response.status}: ${response.statusText}`)
+			}
+			
 			const result = await response.json()
 			
 			// La API devuelve { leads: [...], pagination: {...} }
-			if (result.leads) {
+			if (result.error) {
+				console.error('Error de Supabase:', result.error)
+				// Mostrar leads vacío si hay error, pero no bloquear
+				setLeads([])
+			} else if (result.leads) {
 				setLeads(result.leads)
+			} else {
+				setLeads([])
 			}
 		} catch (error) {
 			console.error('Error fetching leads:', error)
+			// En caso de error, mostrar lista vacía pero no bloquear la UI
+			setLeads([])
 		} finally {
 			setLoading(false)
 		}

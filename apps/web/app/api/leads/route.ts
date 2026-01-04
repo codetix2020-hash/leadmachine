@@ -9,16 +9,38 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { DUMMY_USER_ID } from '@/lib/auth/constants';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// 🔓 Inicializar Supabase con manejo de errores
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+	console.error('❌ ERROR: Variables de Supabase no configuradas');
+	console.error('NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl ? '✅' : '❌');
+	console.error('SUPABASE_SERVICE_ROLE_KEY:', supabaseKey ? '✅' : '❌');
+}
+
+const supabase = supabaseUrl && supabaseKey
+	? createClient(supabaseUrl, supabaseKey)
+	: null;
 
 /**
  * GET - Obtener leads con filtros
  */
 export async function GET(request: NextRequest) {
   try {
+    // 🔓 Verificar que Supabase esté configurado
+    if (!supabase) {
+      console.error('❌ Supabase no está configurado');
+      return NextResponse.json(
+        { 
+          leads: [],
+          pagination: { total: 0, page: 1, limit: 50, totalPages: 0 },
+          error: 'Supabase no está configurado. Verifica las variables de entorno.'
+        },
+        { status: 500 }
+      );
+    }
+
     const searchParams = request.nextUrl.searchParams;
     
     // Parámetros de filtro
