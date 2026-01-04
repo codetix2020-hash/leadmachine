@@ -28,27 +28,29 @@ async function initializeDatabase() {
 	
 	initPromise = (async () => {
 		try {
-			const migrations = [
-				`CREATE TABLE IF NOT EXISTS leads (
-					id TEXT PRIMARY KEY,
-					user_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
-					company_name TEXT NOT NULL,
-					email TEXT,
-					phone TEXT,
-					linkedin_url TEXT,
-					instagram_url TEXT,
-					website TEXT,
-					type TEXT NOT NULL CHECK (type IN ('codetix', 'reservaspro')),
-					score INTEGER NOT NULL DEFAULT 0,
-					status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'contacted', 'interested', 'call_scheduled', 'closed', 'lost')),
-					industry TEXT,
-					location TEXT,
-					employee_count INTEGER,
-					problem_detected TEXT,
-					insight TEXT,
-					created_at TEXT NOT NULL DEFAULT (datetime('now')),
-					updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-				)`,
+		const migrations = [
+			`CREATE TABLE IF NOT EXISTS leads (
+				id TEXT PRIMARY KEY,
+				user_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+				company_name TEXT NOT NULL,
+				email TEXT,
+				phone TEXT,
+				linkedin_url TEXT,
+				instagram_url TEXT,
+				website TEXT,
+				type TEXT NOT NULL CHECK (type IN ('codetix', 'reservaspro')),
+				score INTEGER NOT NULL DEFAULT 0,
+				status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'contacted', 'interested', 'call_scheduled', 'closed', 'lost')),
+				industry TEXT,
+				location TEXT,
+				employee_count INTEGER,
+				problem_detected TEXT,
+				insight TEXT,
+				source TEXT,
+				source_data TEXT,
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+			)`,
 				`CREATE TABLE IF NOT EXISTS conversations (
 					id TEXT PRIMARY KEY,
 					lead_id TEXT NOT NULL,

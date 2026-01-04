@@ -259,6 +259,47 @@ export default function LeadsPage() {
 									<option value="codetix">CodeTix</option>
 								</select>
 							</div>
+
+							<div>
+								<label className="block text-sm font-medium mb-2">
+									Fuentes de búsqueda:
+								</label>
+								<div className="space-y-2 border rounded-md p-3">
+									{[
+										{ id: 'google', label: 'Google Maps' },
+										{ id: 'instagram', label: 'Instagram' },
+										{ id: 'facebook', label: 'Facebook' },
+										{ id: 'linkedin', label: 'LinkedIn' },
+										{ id: 'yelp', label: 'Yelp' },
+									].map((source) => (
+										<label key={source.id} className="flex items-center gap-2 cursor-pointer">
+											<input
+												type="checkbox"
+												checked={searchForm.sources.includes(source.id as any)}
+												onChange={(e) => {
+													if (e.target.checked) {
+														setSearchForm({
+															...searchForm,
+															sources: [...searchForm.sources, source.id as any],
+														})
+													} else {
+														if (searchForm.sources.length > 1) {
+															setSearchForm({
+																...searchForm,
+																sources: searchForm.sources.filter((s) => s !== source.id),
+															})
+														} else {
+															alert('Debes seleccionar al menos una fuente')
+														}
+													}
+												}}
+												className="rounded border-gray-300"
+											/>
+											<span className="text-sm">{source.label}</span>
+										</label>
+									))}
+								</div>
+							</div>
 						</div>
 
 						<div className="flex gap-2 mt-6">
