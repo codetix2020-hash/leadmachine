@@ -15,6 +15,11 @@ import { eq, and, gte, desc, asc, sql } from 'drizzle-orm';
  */
 export async function GET(request: NextRequest) {
 	try {
+		// Importar dinámicamente para evitar errores de build
+		const { db, DUMMY_USER_ID, initializeDatabase } = await import('@/lib/db/client');
+		const { leads } = await import('@/lib/db/schema');
+		const { eq, and, gte } = await import('drizzle-orm');
+
 		// Inicializar base de datos primero
 		await initializeDatabase();
 
@@ -91,14 +96,15 @@ export async function GET(request: NextRequest) {
 				totalPages: Math.ceil(total / limit),
 			},
 		});
-	} catch (error) {
-		console.error('Error en GET /api/leads:', error);
-		console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+	} catch (error: any) {
+		console.error('❌ Error in GET /api/leads:', error?.message || error);
+		console.error('❌ Error stack:', error?.stack || 'No stack');
 		
+		// Devolver 200 para que frontend no crashee (con error en el body)
 		return NextResponse.json(
 			{ 
 				success: false,
-				error: 'Error obteniendo leads',
+				error: error?.message || 'Error obteniendo leads',
 				details: error instanceof Error ? error.message : 'Unknown error',
 				leads: [],
 				pagination: {
@@ -108,7 +114,7 @@ export async function GET(request: NextRequest) {
 					totalPages: 0,
 				}
 			}, 
-			{ status: 500 }
+			{ status: 200 } // 200 para que frontend no crashee
 		);
 	}
 }
