@@ -93,7 +93,12 @@ export default function LeadsPage() {
 	}
 
 	useEffect(() => {
-		fetchLeads()
+		// Solo cargar leads si Supabase está disponible - no bloquear la UI
+		const timeout = setTimeout(() => {
+			fetchLeads()
+		}, 100)
+		
+		return () => clearTimeout(timeout)
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [filters.type, filters.status, filters.minScore])
 

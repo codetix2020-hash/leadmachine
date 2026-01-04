@@ -11,13 +11,19 @@ import {
   findReservasproLeads,
 } from '@/lib/lead-discovery/google-maps-scraper';
 import { analyzeLeadsBatch } from '@/lib/enrichment/analyze-lead';
-import { DUMMY_USER_ID } from '@/lib/auth/constants';
+import { DUMMY_USER_ID } from '@/lib/supabase/client';
 
-// Inicializar Supabase
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Inicializar Supabase con Service Role Key para escritura
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('❌ ERROR: SUPABASE_SERVICE_ROLE_KEY no configurado');
+}
+
+const supabase = supabaseUrl && supabaseServiceKey
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
 
 export async function POST(request: NextRequest) {
   try {
@@ -68,6 +74,10 @@ export async function POST(request: NextRequest) {
     console.log('✅ Leads analizados');
 
     // 3. Guardar en Supabase
+    if (!supabase) {
+      throw new Error('Supabase no está configurado. Verifica SUPABASE_SERVICE_ROLE_KEY en .env');
+    }
+
     console.log('💾 Guardando en Supabase...');
     const leadsToInsert = analyzedLeads.map((lead) => ({
       user_id: DUMMY_USER_ID, // 🔓 User ID dummy para desarrollo sin auth
