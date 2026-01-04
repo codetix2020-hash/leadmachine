@@ -50,8 +50,7 @@ export async function GET(request: NextRequest) {
 			conditions.push(eq(leads.industry, industry));
 		}
 
-		// Obtener total para paginación
-		// Primero obtener todos los leads que cumplen condiciones
+		// Obtener todos los leads que cumplen condiciones (una sola query)
 		const allLeads = await db
 			.select()
 			.from(leads)
@@ -59,15 +58,18 @@ export async function GET(request: NextRequest) {
 		
 		const total = allLeads.length;
 
-		// Obtener leads paginados (usar los que ya obtuvimos para count)
+		// Ordenar y paginar en memoria (más confiable que limit/offset con SQLite)
 		const data = allLeads
 			.sort((a, b) => {
 				// Ordenar por score descendente, luego por created_at
-				if (b.score !== a.score) {
-					return b.score - a.score;
+				const scoreDiff = (b.score || 0) - (a.score || 0);
+				if (scoreDiff !== 0) {
+					return scoreDiff;
 				}
-				// Si score es igual, ordenar por fecha
-				return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+				// Si score es igual, ordenar por fecha (más reciente primero)
+				const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+				const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+				return dateB - dateA;
 			})
 			.slice(offset, offset + limit);
 
