@@ -183,9 +183,13 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 					<div>
 						<strong>Estado:</strong> <span className="capitalize">{lead.status}</span>
 					</div>
-					{lead.email && (
+					{lead.email ? (
 						<div>
 							<strong>Email:</strong> <a href={`mailto:${lead.email}`} className="text-primary hover:underline">{lead.email}</a>
+						</div>
+					) : (
+						<div>
+							<strong>Email:</strong> <span className="text-red-600">❌ No disponible</span>
 						</div>
 					)}
 					{lead.phone && (
@@ -203,6 +207,22 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 					)}
 				</div>
 			</Card>
+
+			{/* Warning si no hay email */}
+			{enrichment && !lead?.email && (
+				<Card className="p-4 mb-6 bg-yellow-50 border-yellow-200">
+					<p className="text-yellow-800">
+						⚠️ Este lead no tiene email. No se puede iniciar outreach automático.
+					</p>
+				</Card>
+			)}
+
+			{/* Debug info */}
+			{enrichment && (
+				<div className="mb-4 p-2 bg-gray-100 rounded text-xs text-gray-600">
+					<strong>Debug:</strong> Enrichment existe: ✅, Email: {lead?.email || '❌ No'}, Outreaching: {outreaching ? 'Sí' : 'No'}
+				</div>
+			)}
 
 			{enrichment && (
 				<>
