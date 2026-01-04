@@ -52,7 +52,7 @@ async function logEmailSent(params: any) {
 			id: crypto.randomUUID(),
 			lead_id: params.leadId,
 			channel: 'email' as const,
-			message_sent: params.subject,
+			message_sent: params.body || params.subject, // Guardar body completo si está disponible
 			created_at: new Date().toISOString(),
 		});
 }
