@@ -35,32 +35,25 @@ export default function LeadsPage() {
 
 			const response = await fetch(`/api/leads?${params.toString()}`)
 			
-			// Intentar parsear JSON siempre
-			let result;
-			try {
-				result = await response.json();
-			} catch (jsonError) {
-				console.error('Error parsing JSON response:', jsonError);
-				throw new Error(`Error ${response.status}: Respuesta inválida del servidor`);
+			if (!response.ok) {
+				throw new Error(`HTTP ${response.status}`)
 			}
 			
-			// Si hay error pero la API devolvió estructura válida, usar array vacío
-			if (!response.ok) {
-				console.error('API error:', result.error || result.details);
-				// Usar leads del response si están disponibles (aunque haya error)
-				setLeads(result.leads || []);
-			} else if (result.error) {
-				console.error('Error en respuesta:', result.error);
-				setLeads(result.leads || []);
-			} else if (result.leads) {
-				setLeads(result.leads);
+			const data = await response.json()
+			
+			// Manejar respuesta de la API
+			if (data.success && Array.isArray(data.leads)) {
+				setLeads(data.leads)
+			} else if (Array.isArray(data.leads)) {
+				// Fallback si no tiene success pero tiene leads
+				setLeads(data.leads)
 			} else {
-				setLeads([]);
+				console.warn('Respuesta inesperada de API:', data)
+				setLeads([])
 			}
 		} catch (error) {
-			console.error('Error fetching leads:', error)
-			// En caso de error, mostrar lista vacía pero no bloquear la UI
-			setLeads([])
+			console.error('Error loading leads:', error)
+			setLeads([]) // Array vacío si falla
 		} finally {
 			setLoading(false)
 		}

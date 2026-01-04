@@ -14,8 +14,10 @@ import { eq, and, gte, desc, asc, sql } from 'drizzle-orm';
  * GET - Obtener leads con filtros
  */
 export async function GET(request: NextRequest) {
-	await initializeDatabase();
 	try {
+		// Inicializar base de datos primero
+		await initializeDatabase();
+
 		const searchParams = request.nextUrl.searchParams;
 
 		// Parámetros de filtro
@@ -50,21 +52,15 @@ export async function GET(request: NextRequest) {
 			conditions.push(eq(leads.industry, industry));
 		}
 
-		// Obtener todos los leads que cumplen condiciones (una sola query)
-		let allLeads;
-		try {
-			allLeads = await db
-				.select()
-				.from(leads)
-				.where(and(...conditions));
-		} catch (dbError) {
-			console.error('Database query error:', dbError);
-			throw new Error(`Error consultando base de datos: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`);
-		}
+		// Obtener todos los leads que cumplen condiciones
+		const allLeads = await db
+			.select()
+			.from(leads)
+			.where(and(...conditions));
 		
-		const total = allLeads?.length || 0;
+		const total = allLeads.length || 0;
 
-		// Ordenar y paginar en memoria (más confiable que limit/offset con SQLite)
+		// Ordenar y paginar en memoria
 		const data = (allLeads || [])
 			.sort((a, b) => {
 				// Ordenar por score descendente, luego por created_at
@@ -79,13 +75,14 @@ export async function GET(request: NextRequest) {
 					const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
 					const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
 					return dateB - dateA;
-				} catch (dateError) {
-					return 0; // Si hay error parseando fechas, mantener orden original
+				} catch {
+					return 0;
 				}
 			})
 			.slice(offset, offset + limit);
 
 		return NextResponse.json({
+			success: true,
 			leads: data || [],
 			pagination: {
 				total,
@@ -96,12 +93,14 @@ export async function GET(request: NextRequest) {
 		});
 	} catch (error) {
 		console.error('Error en GET /api/leads:', error);
-		console.error('Error details:', error instanceof Error ? error.stack : error);
+		console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+		
 		return NextResponse.json(
 			{ 
+				success: false,
 				error: 'Error obteniendo leads',
 				details: error instanceof Error ? error.message : 'Unknown error',
-				leads: [], // Devolver array vacío para que UI no se rompa
+				leads: [],
 				pagination: {
 					total: 0,
 					page: 1,
