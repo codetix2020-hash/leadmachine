@@ -6,12 +6,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { db, DUMMY_USER_ID, initializeDatabase } from '@/lib/db/client';
-import { leads } from '@/lib/db/schema';
-import { eq, and, gte, desc, asc, sql } from 'drizzle-orm';
+import { initializeDatabase } from '@/lib/db/client';
 
 /**
- * GET - Obtener leads con filtros
+ * GET - Obtener leads
  */
 export async function GET(request: NextRequest) {
 	try {
@@ -41,8 +39,13 @@ export async function GET(request: NextRequest) {
  * PUT - Actualizar un lead
  */
 export async function PUT(request: NextRequest) {
-	await initializeDatabase();
 	try {
+		await initializeDatabase();
+		
+		const { db } = await import('@/lib/db/client');
+		const { leads } = await import('@/lib/db/schema');
+		const { eq, sql } = await import('drizzle-orm');
+		
 		const body = await request.json();
 		const { id, ...updates } = body;
 
@@ -50,7 +53,6 @@ export async function PUT(request: NextRequest) {
 			return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
 		}
 
-		// Agregar updated_at
 		const updatedLead = await db
 			.update(leads)
 			.set({
@@ -75,8 +77,13 @@ export async function PUT(request: NextRequest) {
  * DELETE - Eliminar un lead
  */
 export async function DELETE(request: NextRequest) {
-	await initializeDatabase();
 	try {
+		await initializeDatabase();
+		
+		const { db } = await import('@/lib/db/client');
+		const { leads } = await import('@/lib/db/schema');
+		const { eq } = await import('drizzle-orm');
+		
 		const searchParams = request.nextUrl.searchParams;
 		const id = searchParams.get('id');
 
