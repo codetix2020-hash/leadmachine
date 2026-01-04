@@ -1,62 +1,19 @@
 import { routing } from "@i18n/routing";
-import { config as appConfig } from "@repo/config";
-import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
 import createMiddleware from "next-intl/middleware";
-import { withQuery } from "ufo";
 
 const intlMiddleware = createMiddleware(routing);
 
+// 🔓 PROXY SIMPLIFICADO - Sin verificaciones de auth
 export default async function proxy(req: NextRequest) {
-	const { pathname, origin } = req.nextUrl;
+	const { pathname } = req.nextUrl;
 
-	const sessionCookie = getSessionCookie(req);
-
+	// Permitir acceso directo a /app sin ninguna verificación
 	if (pathname.startsWith("/app")) {
-		const response = NextResponse.next();
-
-		if (!appConfig.ui.saas.enabled) {
-			return NextResponse.redirect(new URL("/", origin));
-		}
-
-		// 🔓 AUTH DESHABILITADO - Permitir acceso sin sesión
-		// if (!sessionCookie) {
-		// 	return NextResponse.redirect(
-		// 		new URL(
-		// 			withQuery("/auth/login", {
-		// 				redirectTo: pathname,
-		// 			}),
-		// 			origin,
-		// 		),
-		// 	);
-		// }
-
-		return response;
-	}
-
-	if (pathname.startsWith("/auth")) {
-		if (!appConfig.ui.saas.enabled) {
-			return NextResponse.redirect(new URL("/", origin));
-		}
-
 		return NextResponse.next();
 	}
 
-	const pathsWithoutLocale = [
-		"/onboarding",
-		"/new-organization",
-		"/choose-plan",
-		"/organization-invitation",
-	];
-
-	if (pathsWithoutLocale.some((path) => pathname.startsWith(path))) {
-		return NextResponse.next();
-	}
-
-	if (!appConfig.ui.marketing.enabled) {
-		return NextResponse.redirect(new URL("/app", origin));
-	}
-
+	// Para otras rutas, usar middleware de internacionalización
 	return intlMiddleware(req);
 }
 
