@@ -25,16 +25,12 @@ export default function LeadsPage() {
 		sources: ['google', 'facebook'] as ('google' | 'instagram' | 'linkedin' | 'facebook' | 'yelp')[],
 	})
 
-	// Cargar leads
+	// Cargar leads (sin filtros del servidor por ahora - aplicar en frontend)
 	const fetchLeads = async () => {
 		setLoading(true)
 		try {
-			const params = new URLSearchParams()
-			if (filters.type !== 'all') params.append('type', filters.type)
-			if (filters.status !== 'all') params.append('status', filters.status)
-			if (filters.minScore > 0) params.append('minScore', filters.minScore.toString())
-
-			const response = await fetch(`/api/leads?${params.toString()}`)
+			// Cargar TODOS los leads, filtrar en frontend
+			const response = await fetch(`/api/leads`)
 			
 			if (!response.ok) {
 				throw new Error(`HTTP ${response.status}`)
@@ -121,15 +117,52 @@ export default function LeadsPage() {
 		
 		return () => clearTimeout(timeout)
 	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [filters.type, filters.status, filters.minScore])
+	}, [])
 
-	// Stats
+	// Filtrar leads en frontend
+	const filteredLeads = leads.filter((lead) => {
+		// Filtro de tipo
+		if (filters.type !== 'all' && lead.type !== filters.type) {
+			return false;
+		}
+
+		// Filtro de estado
+		if (filters.status !== 'all' && lead.status !== filters.status) {
+			return false;
+		}
+
+		// Filtro de score mínimo
+		const leadScore = lead.score || 0;
+		if (leadScore < filters.minScore) {
+			return false;
+		}
+
+		// Filtro de contactables
+		if (showOnlyContactable && !lead.email && !lead.phone) {
+			return false;
+		}
+
+		return true;
+	});
+
+	// Debug logs
+	useEffect(() => {
+		console.log('🔍 Filters:', filters);
+		console.log('📞 Contactable only:', showOnlyContactable);
+		console.log('📊 Total leads:', leads.length);
+		console.log('✅ Filtered leads:', filteredLeads.length);
+	}, [filters, showOnlyContactable, leads, filteredLeads]);
+
+	// Stats (basadas en leads filtrados)
 	const stats = {
-		total: leads.length,
-		contacted: leads.filter(l => l.status === 'contacted').length,
-		interested: leads.filter(l => l.status === 'interested').length,
-		avgScore: leads.length > 0 ? Math.round(leads.reduce((sum, l) => sum + l.score, 0) / leads.length) : 0,
-	}
+		total: filteredLeads.length,
+		contacted: filteredLeads.filter((l) => l.status === 'contacted').length,
+		interested: filteredLeads.filter((l) => l.status === 'interested').length,
+		avgScore:
+			filteredLeads.length > 0
+				? Math.round(filteredLeads.reduce((sum, l) => sum + (l.score || 0), 0) / filteredLeads.length)
+				: 0,
+	};
 
 	return (
 		<div className="space-y-8">
@@ -188,13 +221,15 @@ export default function LeadsPage() {
 
 					<select
 						value={filters.minScore}
-						onChange={(e) => setFilters({ ...filters, minScore: parseInt(e.target.value) })}
+						onChange={(e) => setFilters({ ...filters, minScore: parseInt(e.target.value) || 0 })}
 						className="rounded-md border px-3 py-2"
 					>
-						<option value="0">Score mínimo</option>
+						<option value="0">Cualquier score</option>
 						<option value="50">50+</option>
+						<option value="60">60+</option>
 						<option value="70">70+</option>
 						<option value="80">80+</option>
+						<option value="90">90+</option>
 					</select>
 				</div>
 
@@ -206,7 +241,12 @@ export default function LeadsPage() {
 			{/* Leads List */}
 			<div className="rounded-lg border bg-card p-6">
 				<div className="flex items-center justify-between mb-4">
-					<h3 className="text-lg font-semibold">Lista de Leads</h3>
+					<div>
+						<h3 className="text-lg font-semibold">Lista de Leads</h3>
+						<p className="text-sm text-gray-500 mt-1">
+							Mostrando {filteredLeads.length} de {leads.length} leads
+						</p>
+					</div>
 					<label className="flex items-center gap-2 text-sm cursor-pointer">
 						<input
 							type="checkbox"
@@ -222,14 +262,29 @@ export default function LeadsPage() {
 					<div className="text-center py-12 text-muted-foreground">
 						<p>Cargando...</p>
 					</div>
-				) : (showOnlyContactable ? leads.filter((l) => l.email || l.phone) : leads).length === 0 ? (
+				) : filteredLeads.length === 0 ? (
 					<div className="text-center py-12 text-muted-foreground">
-						<p>No hay leads {showOnlyContactable ? 'contactables' : ''} aún.</p>
-						<p className="text-sm mt-2">Haz clic en "Find Leads" para empezar.</p>
+						<p>No hay leads que coincidan con los filtros.</p>
+						<p className="text-sm mt-2">
+							{filters.minScore > 0 && `Score mínimo: ${filters.minScore}+`}
+							{filters.type !== 'all' && ` Tipo: ${filters.type}`}
+							{filters.status !== 'all' && ` Estado: ${filters.status}`}
+							{showOnlyContactable && ' Solo contactables'}
+						</p>
+						<Button
+							onClick={() => {
+								setFilters({ type: 'all', status: 'all', minScore: 0 });
+								setShowOnlyContactable(false);
+							}}
+							variant="outline"
+							className="mt-4"
+						>
+							Limpiar filtros
+						</Button>
 					</div>
 				) : (
 					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-						{(showOnlyContactable ? leads.filter((l) => l.email || l.phone) : leads).map(lead => (
+						{filteredLeads.map((lead) => (
 							<LeadCard key={lead.id} lead={lead} onUpdate={fetchLeads} />
 						))}
 					</div>
