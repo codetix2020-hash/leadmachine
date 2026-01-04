@@ -63,9 +63,10 @@ export const outreachSequences = sqliteTable('outreach_sequences', {
 	sequence_type: text('sequence_type').notNull(),
 	current_step: integer('current_step').default(1).notNull(),
 	next_action_date: text('next_action_date'),
-	status: text('status', { enum: ['active', 'paused', 'completed'] })
+	status: text('status', { enum: ['active', 'paused', 'completed', 'cancelled'] })
 		.default('active')
 		.notNull(),
+	metadata: text('metadata'), // JSON con type, urgency, etc
 	created_at: text('created_at')
 		.default(sql`CURRENT_TIMESTAMP`)
 		.notNull(),

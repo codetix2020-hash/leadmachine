@@ -69,7 +69,8 @@ async function initializeDatabase() {
 					sequence_type TEXT NOT NULL,
 					current_step INTEGER NOT NULL DEFAULT 1,
 					next_action_date TEXT,
-					status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed')),
+					status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed', 'cancelled')),
+					metadata TEXT,
 					created_at TEXT NOT NULL DEFAULT (datetime('now')),
 					updated_at TEXT NOT NULL DEFAULT (datetime('now')),
 					FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE
@@ -124,6 +125,15 @@ async function initializeDatabase() {
 			}
 			if (!columnNames.includes('last_enriched_at')) {
 				await sqlite.execute('ALTER TABLE leads ADD COLUMN last_enriched_at TEXT');
+			}
+			
+			// Agregar metadata a outreach_sequences
+			const sequencesColumnsResult = await sqlite.execute(
+				"PRAGMA table_info(outreach_sequences)"
+			);
+			const sequencesColumnNames = (sequencesColumnsResult.rows || []).map((row: any) => row.name || row[1]);
+			if (!sequencesColumnNames.includes('metadata')) {
+				await sqlite.execute('ALTER TABLE outreach_sequences ADD COLUMN metadata TEXT');
 			}
 		} catch (e) {
 			console.warn('Warning adding columns:', e);
