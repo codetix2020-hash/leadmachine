@@ -75,7 +75,19 @@ export default function LeadsPage() {
 				body: JSON.stringify(searchForm),
 			})
 
+			// Verificar que la respuesta sea JSON válido
+			const contentType = response.headers.get('content-type')
+			if (!contentType?.includes('application/json')) {
+				const text = await response.text()
+				console.error('API response is not JSON:', text)
+				throw new Error(`Error del servidor: ${response.status} ${response.statusText}`)
+			}
+
 			const result = await response.json()
+			
+			if (!response.ok) {
+				throw new Error(result.error || `Error ${response.status}: ${response.statusText}`)
+			}
 			
 			if (result.success) {
 				const sourcesInfo = result.stats?.bySources 
@@ -91,11 +103,11 @@ export default function LeadsPage() {
 				})
 				fetchLeads() // Recargar lista
 			} else {
-				alert(`Error: ${result.error}`)
+				alert(`Error: ${result.error || 'Error desconocido'}`)
 			}
 		} catch (error) {
 			console.error('Error discovering leads:', error)
-			alert('Error al buscar leads')
+			alert(error instanceof Error ? error.message : 'Error al buscar leads')
 		} finally {
 			setLoading(false)
 		}

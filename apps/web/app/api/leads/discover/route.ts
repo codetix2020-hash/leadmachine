@@ -10,8 +10,8 @@ import { db, DUMMY_USER_ID, initializeDatabase } from '@/lib/db/client';
 import { leads } from '@/lib/db/schema';
 
 export async function POST(request: NextRequest) {
-	await initializeDatabase();
 	try {
+		await initializeDatabase();
 		const body = await request.json();
 		const {
 			query,
@@ -62,18 +62,30 @@ export async function POST(request: NextRequest) {
 
 		// 2. Analizar leads con Claude AI
 		console.log('🤖 Analizando leads con Claude AI...');
-		const analyzedLeads = await analyzeLeadsBatch(
-			rawLeads.map((lead) => ({
-				company_name: lead.company_name,
-				email: lead.email,
-				phone: lead.phone,
-				website: lead.website,
-				location: lead.location || location,
-			})),
-			type
-		);
-
-		console.log('✅ Leads analizados');
+		let analyzedLeads;
+		try {
+			analyzedLeads = await analyzeLeadsBatch(
+				rawLeads.map((lead) => ({
+					company_name: lead.company_name,
+					email: lead.email,
+					phone: lead.phone,
+					website: lead.website,
+					location: lead.location || location,
+				})),
+				type
+			);
+			console.log('✅ Leads analizados');
+		} catch (error) {
+			console.error('Error analizando leads, usando datos básicos:', error);
+			// Si falla el análisis, usar datos básicos de rawLeads
+			analyzedLeads = rawLeads.map((lead) => ({
+				...lead,
+				score: 50,
+				problem_detected: 'Análisis pendiente',
+				insight: 'Requiere análisis más detallado',
+				industry: lead.company_name || 'Desconocido',
+			}));
+		}
 
 		// 3. Guardar en SQLite
 		console.log('💾 Guardando en SQLite...');

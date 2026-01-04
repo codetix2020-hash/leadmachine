@@ -173,29 +173,80 @@ function basicAnalysis(
  * Analiza múltiples leads en batch
  */
 export async function analyzeLeadsBatch(
-  leads: GoogleMapsLead[],
+  leads: Array<{
+    company_name: string;
+    email?: string;
+    phone?: string;
+    website?: string;
+    location?: string;
+  }>,
   productType: 'codetix' | 'reservaspro'
-): Promise<Array<GoogleMapsLead & LeadAnalysis>> {
-  const analyzed: Array<GoogleMapsLead & LeadAnalysis> = [];
+): Promise<Array<{
+  company_name: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  location?: string;
+  score: number;
+  problem_detected: string;
+  insight: string;
+  industry: string;
+}>> {
+  if (!leads || leads.length === 0) {
+    return [];
+  }
+
+  const analyzed: any[] = [];
 
   for (const lead of leads) {
     try {
-      const analysis = await analyzeLead(lead, productType);
+      // Convertir a formato GoogleMapsLead para el analizador
+      const googleMapsLead: GoogleMapsLead = {
+        company_name: lead.company_name || 'Unknown',
+        email: lead.email,
+        phone: lead.phone,
+        website: lead.website,
+        location: lead.location || '',
+      };
+
+      const analysis = await analyzeLead(googleMapsLead, productType);
       analyzed.push({
-        ...lead,
-        ...analysis,
+        company_name: lead.company_name,
+        email: lead.email,
+        phone: lead.phone,
+        website: lead.website,
+        location: lead.location,
+        score: analysis.score,
+        problem_detected: analysis.problem_detected,
+        insight: analysis.insight,
+        industry: analysis.industry,
       });
 
-      // Rate limiting: esperar 1 segundo entre llamadas a Claude
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Rate limiting: esperar 500ms entre llamadas a Claude
+      await new Promise((resolve) => setTimeout(resolve, 500));
     } catch (error) {
       console.error(`Error analizando lead ${lead.company_name}:`, error);
       
       // Usar análisis básico en caso de error
-      const fallback = basicAnalysis(lead, productType);
+      const googleMapsLead: GoogleMapsLead = {
+        company_name: lead.company_name || 'Unknown',
+        email: lead.email,
+        phone: lead.phone,
+        website: lead.website,
+        location: lead.location || '',
+      };
+      
+      const fallback = basicAnalysis(googleMapsLead, productType);
       analyzed.push({
-        ...lead,
-        ...fallback,
+        company_name: lead.company_name,
+        email: lead.email,
+        phone: lead.phone,
+        website: lead.website,
+        location: lead.location,
+        score: fallback.score,
+        problem_detected: fallback.problem_detected,
+        insight: fallback.insight,
+        industry: fallback.industry,
       });
     }
   }
