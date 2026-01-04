@@ -139,6 +139,16 @@ async function initializeDatabase() {
 		} catch (e) {
 			// Columna ya existe, ignorar
 		}
+		try {
+			await sqlite.execute('ALTER TABLE leads ADD COLUMN enrichment_data TEXT');
+		} catch (e) {
+			// Columna ya existe, ignorar
+		}
+		try {
+			await sqlite.execute('ALTER TABLE leads ADD COLUMN last_enriched_at TEXT');
+		} catch (e) {
+			// Columna ya existe, ignorar
+		}
 
 			// Habilitar foreign keys
 			await sqlite.execute('PRAGMA foreign_keys = ON');
