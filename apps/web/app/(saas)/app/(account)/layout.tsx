@@ -1,6 +1,6 @@
-import { AppWrapper } from "@saas/shared/components/AppWrapper";
 import type { PropsWithChildren } from "react";
 
+// 🔓 Layout simplificado sin AppWrapper que puede estar bloqueando
 export default function UserLayout({ children }: PropsWithChildren) {
-	return <AppWrapper>{children}</AppWrapper>;
+	return <div>{children}</div>;
 }

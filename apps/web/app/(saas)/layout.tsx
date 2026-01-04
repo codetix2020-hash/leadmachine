@@ -14,29 +14,18 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import type { PropsWithChildren } from "react";
 
-// 🔓 Layout sin autenticación
+// 🔓 Layout sin autenticación - SIMPLIFICADO AL MÁXIMO
 export default async function SaaSLayout({ children }: PropsWithChildren) {
 	const locale = await getLocale();
 	const messages = await getMessages();
-	// const session = await getSession(); // DESHABILITADO
-	// if (!session) { redirect("/auth/login"); } // DESHABILITADO
-
 	const queryClient = getServerQueryClient();
 
-	// Prefetch deshabilitado para evitar errores sin sesión
-	// await queryClient.prefetchQuery({
-	// 	queryKey: sessionQueryKey,
-	// 	queryFn: () => session,
-	// });
-
-	// 🔓 Sin providers que requieren auth - render directo
+	// 🔓 Render directo sin ningún provider que pueda bloquear
 	return (
 		<Document locale={locale}>
 			<NextIntlClientProvider messages={messages}>
 				<HydrationBoundary state={dehydrate(queryClient)}>
-					<ConfirmationAlertProvider>
-						{children}
-					</ConfirmationAlertProvider>
+					{children}
 				</HydrationBoundary>
 			</NextIntlClientProvider>
 		</Document>

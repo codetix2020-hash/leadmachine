@@ -6,5 +6,6 @@ export default async function Home({
 }: {
 	params: Promise<{ locale: string }>;
 }) {
-	redirect("/app/leads");
+	// Redirect directo a página de prueba primero para verificar que funciona
+	redirect("/test");
 }
