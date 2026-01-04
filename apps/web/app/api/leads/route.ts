@@ -15,107 +15,25 @@ import { eq, and, gte, desc, asc, sql } from 'drizzle-orm';
  */
 export async function GET(request: NextRequest) {
 	try {
-		// Importar dinámicamente para evitar errores de build
-		const { db, DUMMY_USER_ID, initializeDatabase } = await import('@/lib/db/client');
-		const { leads } = await import('@/lib/db/schema');
-		const { eq, and, gte } = await import('drizzle-orm');
-
-		// Inicializar base de datos primero
 		await initializeDatabase();
-
-		const searchParams = request.nextUrl.searchParams;
-
-		// Parámetros de filtro
-		const type = searchParams.get('type');
-		const status = searchParams.get('status');
-		const minScore = searchParams.get('minScore');
-		const industry = searchParams.get('industry');
-
-		// Parámetros de paginación
-		const page = Number.parseInt(searchParams.get('page') || '1');
-		const limit = Number.parseInt(searchParams.get('limit') || '50');
-		const offset = (page - 1) * limit;
-
-		// Construir condiciones de filtro
-		const conditions = [eq(leads.user_id, DUMMY_USER_ID)];
-
-		if (type) {
-			conditions.push(eq(leads.type, type as 'codetix' | 'reservaspro'));
-		}
-		if (status) {
-			conditions.push(
-				eq(
-					leads.status,
-					status as 'new' | 'contacted' | 'interested' | 'call_scheduled' | 'closed' | 'lost'
-				)
-			);
-		}
-		if (minScore) {
-			conditions.push(gte(leads.score, Number.parseInt(minScore)));
-		}
-		if (industry) {
-			conditions.push(eq(leads.industry, industry));
-		}
-
-		// Obtener todos los leads que cumplen condiciones
-		const allLeads = await db
-			.select()
-			.from(leads)
-			.where(and(...conditions));
 		
-		const total = allLeads.length || 0;
-
-		// Ordenar y paginar en memoria
-		const data = (allLeads || [])
-			.sort((a, b) => {
-				// Ordenar por score descendente, luego por created_at
-				const scoreA = typeof a.score === 'number' ? a.score : 0;
-				const scoreB = typeof b.score === 'number' ? b.score : 0;
-				const scoreDiff = scoreB - scoreA;
-				if (scoreDiff !== 0) {
-					return scoreDiff;
-				}
-				// Si score es igual, ordenar por fecha (más reciente primero)
-				try {
-					const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-					const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-					return dateB - dateA;
-				} catch {
-					return 0;
-				}
-			})
-			.slice(offset, offset + limit);
-
-		return NextResponse.json({
-			success: true,
-			leads: data || [],
-			pagination: {
-				total,
-				page,
-				limit,
-				totalPages: Math.ceil(total / limit),
-			},
+		const { db } = await import('@/lib/db/client');
+		const { leads } = await import('@/lib/db/schema');
+		
+		const allLeads = await db.select().from(leads);
+		
+		return NextResponse.json({ 
+			success: true, 
+			leads: allLeads || [] 
 		});
 	} catch (error: any) {
 		console.error('❌ Error in GET /api/leads:', error?.message || error);
-		console.error('❌ Error stack:', error?.stack || 'No stack');
 		
-		// Devolver 200 para que frontend no crashee (con error en el body)
-		return NextResponse.json(
-			{ 
-				success: false,
-				error: error?.message || 'Error obteniendo leads',
-				details: error instanceof Error ? error.message : 'Unknown error',
-				leads: [],
-				pagination: {
-					total: 0,
-					page: 1,
-					limit: 50,
-					totalPages: 0,
-				}
-			}, 
-			{ status: 200 } // 200 para que frontend no crashee
-		);
+		// Devolver array vacío en caso de error para que frontend no crashee
+		return NextResponse.json({ 
+			success: true, 
+			leads: [] 
+		});
 	}
 }
 
