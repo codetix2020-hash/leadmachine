@@ -7,6 +7,7 @@ import {
 	UsersIcon,
 	TrendingUpIcon,
 	BarChart3Icon,
+	InboxIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -34,6 +35,12 @@ export function NavBar() {
 			href: "/app/analytics",
 			icon: BarChart3Icon,
 			isActive: pathname.includes("/analytics"),
+		},
+		{
+			label: "Inbox",
+			href: "/app/inbox",
+			icon: InboxIcon,
+			isActive: pathname.includes("/inbox"),
 		},
 	];
 
