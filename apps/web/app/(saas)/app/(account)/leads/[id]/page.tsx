@@ -231,11 +231,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 				</div>
 			</Card>
 
-			{/* Warning si no hay email */}
-			{enrichment && !lead?.email && (
+			{/* Warning si no hay ningún contacto */}
+			{enrichment && !lead?.email && !lead?.phone && (
 				<Card className="p-4 mb-6 bg-yellow-50 border-yellow-200">
 					<p className="text-yellow-800">
-						⚠️ Este lead no tiene email. No se puede iniciar outreach automático.
+						⚠️ Este lead no tiene email ni teléfono. Se intentará buscar contactos automáticamente al iniciar outreach.
 					</p>
 				</Card>
 			)}

@@ -10,6 +10,7 @@ export default function LeadsPage() {
 	const [leads, setLeads] = useState<Lead[]>([])
 	const [loading, setLoading] = useState(false)
 	const [showModal, setShowModal] = useState(false)
+	const [showOnlyContactable, setShowOnlyContactable] = useState(false)
 	const [filters, setFilters] = useState({
 		type: 'all',
 		status: 'all',
@@ -204,20 +205,31 @@ export default function LeadsPage() {
 
 			{/* Leads List */}
 			<div className="rounded-lg border bg-card p-6">
-				<h3 className="text-lg font-semibold mb-4">Lista de Leads</h3>
+				<div className="flex items-center justify-between mb-4">
+					<h3 className="text-lg font-semibold">Lista de Leads</h3>
+					<label className="flex items-center gap-2 text-sm cursor-pointer">
+						<input
+							type="checkbox"
+							checked={showOnlyContactable}
+							onChange={(e) => setShowOnlyContactable(e.target.checked)}
+							className="w-4 h-4"
+						/>
+						Mostrar solo contactables (email o teléfono)
+					</label>
+				</div>
 				
 				{loading ? (
 					<div className="text-center py-12 text-muted-foreground">
 						<p>Cargando...</p>
 					</div>
-				) : leads.length === 0 ? (
+				) : (showOnlyContactable ? leads.filter((l) => l.email || l.phone) : leads).length === 0 ? (
 					<div className="text-center py-12 text-muted-foreground">
-						<p>No hay leads aún.</p>
+						<p>No hay leads {showOnlyContactable ? 'contactables' : ''} aún.</p>
 						<p className="text-sm mt-2">Haz clic en "Find Leads" para empezar.</p>
 					</div>
 				) : (
 					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-						{leads.map(lead => (
+						{(showOnlyContactable ? leads.filter((l) => l.email || l.phone) : leads).map(lead => (
 							<LeadCard key={lead.id} lead={lead} onUpdate={fetchLeads} />
 						))}
 					</div>
