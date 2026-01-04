@@ -25,6 +25,8 @@ export const leads = sqliteTable('leads', {
 	insight: text('insight'),
 	source: text('source'), // 'google', 'instagram', 'linkedin', 'facebook', 'yelp'
 	sourceData: text('source_data'), // JSON con data específica de fuente
+	enrichmentData: text('enrichment_data'), // JSON con deep enrichment completo
+	lastEnrichedAt: text('last_enriched_at'), // timestamp
 	created_at: text('created_at')
 		.default(sql`CURRENT_TIMESTAMP`)
 		.notNull(),

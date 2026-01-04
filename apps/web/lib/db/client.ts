@@ -48,6 +48,8 @@ async function initializeDatabase() {
 				insight TEXT,
 				source TEXT,
 				source_data TEXT,
+				enrichment_data TEXT,
+				last_enriched_at TEXT,
 				created_at TEXT NOT NULL DEFAULT (datetime('now')),
 				updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 			)`,

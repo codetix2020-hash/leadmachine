@@ -3,6 +3,7 @@
 import type { Lead } from '../../../types/lead'
 import { Button } from '@ui/components/button'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface LeadCardProps {
 	lead: Lead
@@ -11,6 +12,7 @@ interface LeadCardProps {
 
 export function LeadCard({ lead, onUpdate }: LeadCardProps) {
 	const [loading, setLoading] = useState(false)
+	const router = useRouter()
 
 	// Color del score
 	const getScoreColor = (score: number) => {
@@ -184,6 +186,18 @@ export function LeadCard({ lead, onUpdate }: LeadCardProps) {
 					disabled={loading}
 				>
 					✓ Cerrar
+				</Button>
+			</div>
+
+			{/* Botón Análisis Completo */}
+			<div className="mt-3 pt-3 border-t">
+				<Button
+					size="sm"
+					variant="outline"
+					onClick={() => router.push(`/app/leads/${lead.id}`)}
+					className="w-full"
+				>
+					🔍 Ver Análisis Completo
 				</Button>
 			</div>
 
