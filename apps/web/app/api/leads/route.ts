@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { DUMMY_USER_ID } from '@/lib/auth/constants';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,10 +32,11 @@ export async function GET(request: NextRequest) {
     const limit = Number.parseInt(searchParams.get('limit') || '50');
     const offset = (page - 1) * limit;
 
-    // Construir query
+    // Construir query - filtrar por user_id dummy
     let query = supabase
       .from('leads')
-      .select('*', { count: 'exact' });
+      .select('*', { count: 'exact' })
+      .eq('user_id', DUMMY_USER_ID); // 🔓 Filtrar por user_id dummy
 
     // Aplicar filtros
     if (type) query = query.eq('type', type);

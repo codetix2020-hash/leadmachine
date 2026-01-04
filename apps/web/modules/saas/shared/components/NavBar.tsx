@@ -1,45 +1,22 @@
 "use client";
 import { config } from "@repo/config";
-import { useSession } from "@saas/auth/hooks/use-session";
-import { useActiveOrganization } from "@saas/organizations/hooks/use-active-organization";
-import { UserMenu } from "@saas/shared/components/UserMenu";
 import { Logo } from "@shared/components/Logo";
 import { cn } from "@ui/lib";
 import {
-	BotMessageSquareIcon,
-	ChevronRightIcon,
 	HomeIcon,
-	SettingsIcon,
-	UserCog2Icon,
-	UserCogIcon,
 	UsersIcon,
 	TrendingUpIcon,
 	BarChart3Icon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useTranslations } from "next-intl";
-import { OrganzationSelect } from "../../organizations/components/OrganizationSelect";
 
+// 🔓 NavBar sin autenticación
 export function NavBar() {
-	const t = useTranslations();
 	const pathname = usePathname();
-	const { user } = useSession();
-	const { activeOrganization, isOrganizationAdmin } = useActiveOrganization();
-
 	const { useSidebarLayout } = config.ui.saas;
 
-	const basePath = activeOrganization
-		? `/app/${activeOrganization.slug}`
-		: "/app";
-
 	const menuItems = [
-		{
-			label: t("app.menu.start"),
-			href: basePath,
-			icon: HomeIcon,
-			isActive: pathname === basePath,
-		},
 		{
 			label: "Leads",
 			href: "/app/leads",
@@ -58,32 +35,6 @@ export function NavBar() {
 			icon: BarChart3Icon,
 			isActive: pathname.includes("/analytics"),
 		},
-		...(activeOrganization && isOrganizationAdmin
-			? [
-					{
-						label: t("app.menu.organizationSettings"),
-						href: `${basePath}/settings`,
-						icon: SettingsIcon,
-						isActive: pathname.startsWith(`${basePath}/settings/`),
-					},
-				]
-			: []),
-		{
-			label: t("app.menu.accountSettings"),
-			href: "/app/settings",
-			icon: UserCog2Icon,
-			isActive: pathname.startsWith("/app/settings/"),
-		},
-		...(user?.role === "admin"
-			? [
-					{
-						label: t("app.menu.admin"),
-						href: "/app/admin",
-						icon: UserCogIcon,
-						isActive: pathname.startsWith("/app/admin/"),
-					},
-				]
-			: []),
 	];
 
 	return (
@@ -106,43 +57,9 @@ export function NavBar() {
 								useSidebarLayout,
 						})}
 					>
-						<Link href="/app" className="block">
+						<Link href="/app/leads" className="block">
 							<Logo />
 						</Link>
-
-						{config.organizations.enable &&
-							!config.organizations.hideOrganization && (
-								<>
-									<span
-										className={cn(
-											"hidden opacity-30 md:block",
-											{
-												"md:hidden": useSidebarLayout,
-											},
-										)}
-									>
-										<ChevronRightIcon className="size-4" />
-									</span>
-
-									<OrganzationSelect
-										className={cn({
-											"md:-mx-2 md:mt-2":
-												useSidebarLayout,
-										})}
-									/>
-								</>
-							)}
-					</div>
-
-					<div
-						className={cn(
-							"mr-0 ml-auto flex items-center justify-end gap-4",
-							{
-								"md:hidden": useSidebarLayout,
-							},
-						)}
-					>
-						<UserMenu />
 					</div>
 				</div>
 
@@ -186,16 +103,7 @@ export function NavBar() {
 					))}
 				</ul>
 
-				<div
-					className={cn(
-						"-mx-4 md:-mx-6 mt-auto mb-0 hidden p-4 md:p-4",
-						{
-							"md:block": useSidebarLayout,
-						},
-					)}
-				>
-					<UserMenu showUserName />
-				</div>
+				{/* UserMenu removido - sin autenticación */}
 			</div>
 		</nav>
 	);

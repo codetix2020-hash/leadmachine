@@ -11,6 +11,7 @@ import {
   findReservasproLeads,
 } from '@/lib/lead-discovery/google-maps-scraper';
 import { analyzeLeadsBatch } from '@/lib/enrichment/analyze-lead';
+import { DUMMY_USER_ID } from '@/lib/auth/constants';
 
 // Inicializar Supabase
 const supabase = createClient(
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest) {
     // 3. Guardar en Supabase
     console.log('💾 Guardando en Supabase...');
     const leadsToInsert = analyzedLeads.map((lead) => ({
+      user_id: DUMMY_USER_ID, // 🔓 User ID dummy para desarrollo sin auth
       company_name: lead.company_name,
       email: lead.email,
       phone: lead.phone,
