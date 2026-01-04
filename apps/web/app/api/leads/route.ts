@@ -51,25 +51,37 @@ export async function GET(request: NextRequest) {
 		}
 
 		// Obtener todos los leads que cumplen condiciones (una sola query)
-		const allLeads = await db
-			.select()
-			.from(leads)
-			.where(and(...conditions));
+		let allLeads;
+		try {
+			allLeads = await db
+				.select()
+				.from(leads)
+				.where(and(...conditions));
+		} catch (dbError) {
+			console.error('Database query error:', dbError);
+			throw new Error(`Error consultando base de datos: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`);
+		}
 		
-		const total = allLeads.length;
+		const total = allLeads?.length || 0;
 
 		// Ordenar y paginar en memoria (más confiable que limit/offset con SQLite)
-		const data = allLeads
+		const data = (allLeads || [])
 			.sort((a, b) => {
 				// Ordenar por score descendente, luego por created_at
-				const scoreDiff = (b.score || 0) - (a.score || 0);
+				const scoreA = typeof a.score === 'number' ? a.score : 0;
+				const scoreB = typeof b.score === 'number' ? b.score : 0;
+				const scoreDiff = scoreB - scoreA;
 				if (scoreDiff !== 0) {
 					return scoreDiff;
 				}
 				// Si score es igual, ordenar por fecha (más reciente primero)
-				const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-				const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-				return dateB - dateA;
+				try {
+					const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+					const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+					return dateB - dateA;
+				} catch (dateError) {
+					return 0; // Si hay error parseando fechas, mantener orden original
+				}
 			})
 			.slice(offset, offset + limit);
 
