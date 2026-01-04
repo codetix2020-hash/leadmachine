@@ -8,6 +8,10 @@ const withNextIntl = nextIntlPlugin("./modules/i18n/request.ts");
 
 const nextConfig: NextConfig = {
 	transpilePackages: ["@repo/api", "@repo/auth", "@repo/database"],
+	// 🔧 Deshabilitar Turbopack para evitar errores de symlinks en Windows
+	experimental: {
+		turbopack: false,
+	},
 	images: {
 		remotePatterns: [
 			{

@@ -4,121 +4,94 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import {
-  searchGoogleMaps,
-  findCodetixLeads,
-  findReservasproLeads,
+	searchGoogleMaps,
+	findCodetixLeads,
+	findReservasproLeads,
 } from '@/lib/lead-discovery/google-maps-scraper';
 import { analyzeLeadsBatch } from '@/lib/enrichment/analyze-lead';
-import { DUMMY_USER_ID } from '@/lib/auth/constants';
-
-// Inicializar Supabase con Service Role Key para escritura
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('❌ ERROR: SUPABASE_SERVICE_ROLE_KEY no configurado');
-}
-
-const supabase = supabaseUrl && supabaseServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey)
-  : null;
+import { db, DUMMY_USER_ID } from '@/lib/db/client';
+import { leads } from '@/lib/db/schema';
 
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { query, location, type, maxResults = 20 } = body;
+	try {
+		const body = await request.json();
+		const { query, location, type, maxResults = 20 } = body;
 
-    // Validación
-    if (!location) {
-      return NextResponse.json(
-        { error: 'Location es requerido' },
-        { status: 400 }
-      );
-    }
+		// Validación
+		if (!location) {
+			return NextResponse.json({ error: 'Location es requerido' }, { status: 400 });
+		}
 
-    if (!type || !['codetix', 'reservaspro'].includes(type)) {
-      return NextResponse.json(
-        { error: 'Type debe ser "codetix" o "reservaspro"' },
-        { status: 400 }
-      );
-    }
+		if (!type || !['codetix', 'reservaspro'].includes(type)) {
+			return NextResponse.json(
+				{ error: 'Type debe ser "codetix" o "reservaspro"' },
+				{ status: 400 }
+			);
+		}
 
-    console.log(`🔍 Buscando leads para ${type} en ${location}...`);
+		console.log(`🔍 Buscando leads para ${type} en ${location}...`);
 
-    // 1. Buscar leads en Google Maps
-    let googleLeads;
-    if (query) {
-      // Búsqueda personalizada
-      googleLeads = await searchGoogleMaps({
-        query,
-        location,
-        maxResults,
-      });
-    } else {
-      // Búsqueda predefinida según tipo
-      if (type === 'codetix') {
-        googleLeads = await findCodetixLeads(location, maxResults);
-      } else {
-        googleLeads = await findReservasproLeads(location, maxResults);
-      }
-    }
+		// 1. Buscar leads en Google Maps
+		let googleLeads;
+		if (query) {
+			// Búsqueda personalizada
+			googleLeads = await searchGoogleMaps({
+				query,
+				location,
+				maxResults,
+			});
+		} else {
+			// Búsqueda predefinida según tipo
+			if (type === 'codetix') {
+				googleLeads = await findCodetixLeads(location, maxResults);
+			} else {
+				googleLeads = await findReservasproLeads(location, maxResults);
+			}
+		}
 
-    console.log(`✅ Encontrados ${googleLeads.length} leads en Google Maps`);
+		console.log(`✅ Encontrados ${googleLeads.length} leads en Google Maps`);
 
-    // 2. Analizar leads con Claude AI
-    console.log('🤖 Analizando leads con Claude AI...');
-    const analyzedLeads = await analyzeLeadsBatch(googleLeads, type);
+		// 2. Analizar leads con Claude AI
+		console.log('🤖 Analizando leads con Claude AI...');
+		const analyzedLeads = await analyzeLeadsBatch(googleLeads, type);
 
-    console.log('✅ Leads analizados');
+		console.log('✅ Leads analizados');
 
-    // 3. Guardar en Supabase
-    if (!supabase) {
-      throw new Error('Supabase no está configurado. Verifica SUPABASE_SERVICE_ROLE_KEY en .env');
-    }
+		// 3. Guardar en SQLite
+		console.log('💾 Guardando en SQLite...');
+		const leadsToInsert = analyzedLeads.map((lead) => ({
+			user_id: DUMMY_USER_ID,
+			company_name: lead.company_name,
+			email: lead.email || null,
+			phone: lead.phone || null,
+			website: lead.website || null,
+			type: type as 'codetix' | 'reservaspro',
+			score: lead.score,
+			status: 'new' as const,
+			industry: lead.industry || null,
+			location: lead.location || null,
+			problem_detected: lead.problem_detected || null,
+			insight: lead.insight || null,
+		}));
 
-    console.log('💾 Guardando en Supabase...');
-    const leadsToInsert = analyzedLeads.map((lead) => ({
-      user_id: DUMMY_USER_ID, // 🔓 User ID dummy para desarrollo sin auth
-      company_name: lead.company_name,
-      email: lead.email,
-      phone: lead.phone,
-      website: lead.website,
-      type: type,
-      score: lead.score,
-      status: 'new',
-      industry: lead.industry,
-      location: lead.location,
-      problem_detected: lead.problem_detected,
-      insight: lead.insight,
-    }));
+		const insertedLeads = await db.insert(leads).values(leadsToInsert).returning();
 
-    const { data, error } = await supabase
-      .from('leads')
-      .insert(leadsToInsert)
-      .select();
+		console.log(`✅ ${insertedLeads.length} leads guardados en SQLite`);
 
-    if (error) {
-      console.error('Error guardando en Supabase:', error);
-      throw error;
-    }
-
-    console.log(`✅ ${data?.length || 0} leads guardados en Supabase`);
-
-    return NextResponse.json({
-      success: true,
-      leads: data,
-      count: data?.length || 0,
-    });
-  } catch (error) {
-    console.error('Error en /api/leads/discover:', error);
-    return NextResponse.json(
-      {
-        error: 'Error descubriendo leads',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
-  }
+		return NextResponse.json({
+			success: true,
+			leads: insertedLeads,
+			count: insertedLeads.length,
+		});
+	} catch (error) {
+		console.error('Error en /api/leads/discover:', error);
+		return NextResponse.json(
+			{
+				error: 'Error descubriendo leads',
+				details: error instanceof Error ? error.message : 'Unknown error',
+			},
+			{ status: 500 }
+		);
+	}
 }

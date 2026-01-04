@@ -6,156 +6,135 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { DUMMY_USER_ID } from '@/lib/auth/constants';
-
-// 🔓 Inicializar Supabase con Service Role Key
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-	console.error('❌ ERROR: Variables de Supabase no configuradas');
-	console.error('NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl ? '✅' : '❌');
-	console.error('SUPABASE_SERVICE_ROLE_KEY:', supabaseKey ? '✅' : '❌');
-}
-
-const supabase = supabaseUrl && supabaseKey
-	? createClient(supabaseUrl, supabaseKey)
-	: null;
+import { db, DUMMY_USER_ID } from '@/lib/db/client';
+import { leads } from '@/lib/db/schema';
+import { eq, and, gte, desc, asc, sql } from 'drizzle-orm';
 
 /**
  * GET - Obtener leads con filtros
  */
 export async function GET(request: NextRequest) {
-  try {
-    // 🔓 Verificar que Supabase esté configurado
-    if (!supabase) {
-      console.error('❌ Supabase no está configurado');
-      return NextResponse.json(
-        { 
-          leads: [],
-          pagination: { total: 0, page: 1, limit: 50, totalPages: 0 },
-          error: 'Supabase no está configurado. Verifica las variables de entorno.'
-        },
-        { status: 500 }
-      );
-    }
+	try {
+		const searchParams = request.nextUrl.searchParams;
 
-    const searchParams = request.nextUrl.searchParams;
-    
-    // Parámetros de filtro
-    const type = searchParams.get('type');
-    const status = searchParams.get('status');
-    const minScore = searchParams.get('minScore');
-    const industry = searchParams.get('industry');
-    
-    // Parámetros de paginación
-    const page = Number.parseInt(searchParams.get('page') || '1');
-    const limit = Number.parseInt(searchParams.get('limit') || '50');
-    const offset = (page - 1) * limit;
+		// Parámetros de filtro
+		const type = searchParams.get('type');
+		const status = searchParams.get('status');
+		const minScore = searchParams.get('minScore');
+		const industry = searchParams.get('industry');
 
-    // Construir query - filtrar por user_id dummy
-    let query = supabase
-      .from('leads')
-      .select('*', { count: 'exact' })
-      .eq('user_id', DUMMY_USER_ID); // 🔓 Filtrar por user_id dummy
+		// Parámetros de paginación
+		const page = Number.parseInt(searchParams.get('page') || '1');
+		const limit = Number.parseInt(searchParams.get('limit') || '50');
+		const offset = (page - 1) * limit;
 
-    // Aplicar filtros
-    if (type) query = query.eq('type', type);
-    if (status) query = query.eq('status', status);
-    if (minScore) query = query.gte('score', Number.parseInt(minScore));
-    if (industry) query = query.eq('industry', industry);
+		// Construir condiciones de filtro
+		const conditions = [eq(leads.user_id, DUMMY_USER_ID)];
 
-    // Ordenar y paginar
-    query = query
-      .order('score', { ascending: false })
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+		if (type) {
+			conditions.push(eq(leads.type, type as 'codetix' | 'reservaspro'));
+		}
+		if (status) {
+			conditions.push(
+				eq(
+					leads.status,
+					status as 'new' | 'contacted' | 'interested' | 'call_scheduled' | 'closed' | 'lost'
+				)
+			);
+		}
+		if (minScore) {
+			conditions.push(gte(leads.score, Number.parseInt(minScore)));
+		}
+		if (industry) {
+			conditions.push(eq(leads.industry, industry));
+		}
 
-    const { data, error, count } = await query;
+		// Obtener total para paginación
+		const totalResult = await db
+			.select({ count: sql<number>`count(*)` })
+			.from(leads)
+			.where(and(...conditions));
 
-    if (error) throw error;
+		const total = totalResult[0]?.count || 0;
 
-    return NextResponse.json({
-      leads: data || [],
-      pagination: {
-        total: count || 0,
-        page,
-        limit,
-        totalPages: Math.ceil((count || 0) / limit),
-      },
-    });
-  } catch (error) {
-    console.error('Error en GET /api/leads:', error);
-    return NextResponse.json(
-      { error: 'Error obteniendo leads' },
-      { status: 500 }
-    );
-  }
+		// Obtener leads paginados
+		const data = await db
+			.select()
+			.from(leads)
+			.where(and(...conditions))
+			.orderBy(desc(leads.score), desc(leads.created_at))
+			.limit(limit)
+			.offset(offset);
+
+		return NextResponse.json({
+			leads: data || [],
+			pagination: {
+				total,
+				page,
+				limit,
+				totalPages: Math.ceil(total / limit),
+			},
+		});
+	} catch (error) {
+		console.error('Error en GET /api/leads:', error);
+		return NextResponse.json({ error: 'Error obteniendo leads' }, { status: 500 });
+	}
 }
 
 /**
  * PUT - Actualizar un lead
  */
 export async function PUT(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { id, ...updates } = body;
+	try {
+		const body = await request.json();
+		const { id, ...updates } = body;
 
-    if (!id) {
-      return NextResponse.json(
-        { error: 'ID es requerido' },
-        { status: 400 }
-      );
-    }
+		if (!id) {
+			return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
+		}
 
-    const { data, error } = await supabase
-      .from('leads')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
+		// Agregar updated_at
+		const updatedLead = await db
+			.update(leads)
+			.set({
+				...updates,
+				updated_at: sql`CURRENT_TIMESTAMP`,
+			})
+			.where(eq(leads.id, id))
+			.returning();
 
-    if (error) throw error;
+		if (updatedLead.length === 0) {
+			return NextResponse.json({ error: 'Lead no encontrado' }, { status: 404 });
+		}
 
-    return NextResponse.json({ lead: data });
-  } catch (error) {
-    console.error('Error en PUT /api/leads:', error);
-    return NextResponse.json(
-      { error: 'Error actualizando lead' },
-      { status: 500 }
-    );
-  }
+		return NextResponse.json({ lead: updatedLead[0] });
+	} catch (error) {
+		console.error('Error en PUT /api/leads:', error);
+		return NextResponse.json({ error: 'Error actualizando lead' }, { status: 500 });
+	}
 }
 
 /**
  * DELETE - Eliminar un lead
  */
 export async function DELETE(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams;
-    const id = searchParams.get('id');
+	try {
+		const searchParams = request.nextUrl.searchParams;
+		const id = searchParams.get('id');
 
-    if (!id) {
-      return NextResponse.json(
-        { error: 'ID es requerido' },
-        { status: 400 }
-      );
-    }
+		if (!id) {
+			return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
+		}
 
-    const { error } = await supabase
-      .from('leads')
-      .delete()
-      .eq('id', id);
+		const deletedLead = await db.delete(leads).where(eq(leads.id, id)).returning();
 
-    if (error) throw error;
+		if (deletedLead.length === 0) {
+			return NextResponse.json({ error: 'Lead no encontrado' }, { status: 404 });
+		}
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error en DELETE /api/leads:', error);
-    return NextResponse.json(
-      { error: 'Error eliminando lead' },
-      { status: 500 }
-    );
-  }
+		return NextResponse.json({ success: true });
+	} catch (error) {
+		console.error('Error en DELETE /api/leads:', error);
+		return NextResponse.json({ error: 'Error eliminando lead' }, { status: 500 });
+	}
 }
