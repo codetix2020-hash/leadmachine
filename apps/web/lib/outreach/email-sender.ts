@@ -34,6 +34,7 @@ export async function sendEmail(params: { to: string; subject: string; body: str
 			leadId: params.leadId,
 			emailId: data?.id,
 			subject: params.subject,
+			body: params.body,
 		});
 
 		return { success: true, emailId: data?.id };
