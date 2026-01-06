@@ -70,3 +70,5 @@ C:\dev\LINK\supastarter-nextjs\
 
 **¡El servidor está compilando! Espera ~30 segundos y abre /test** 🚀
 
+
+

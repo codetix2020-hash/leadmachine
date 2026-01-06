@@ -114,3 +114,5 @@ function determineBestTiming(signals: any[], urgencyScore: number): string {
 	return 'Timing normal - contactar cuando sea conveniente';
 }
 
+
+

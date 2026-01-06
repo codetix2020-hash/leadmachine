@@ -1,25 +1,46 @@
 import { Resend } from 'resend';
+import { isTestingMode } from '@/lib/testing/dry-run-mode';
+import { verifyEmail } from '@/lib/email/verifier';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendEmail(params: { to: string; subject: string; body: string; leadId: string }) {
+	// TESTING MODE: No enviar, solo log
+	if (isTestingMode()) {
+		console.log('🧪 [DRY RUN] Email would be sent:');
+		console.log(`  To: ${params.to}`);
+		console.log(`  Subject: ${params.subject}`);
+		console.log(`  Body preview: ${params.body.substring(0, 100)}...`);
+
+		// Simular éxito
+		await logEmailSent({
+			leadId: params.leadId,
+			emailId: 'dry-run-' + Date.now(),
+			subject: params.subject,
+			body: params.body,
+		});
+
+		return {
+			success: true,
+			emailId: 'dry-run-' + Date.now(),
+			mode: 'testing',
+		};
+	}
+
+	// MODO REAL: Enviar de verdad
 	try {
+		// Verificar email antes de enviar
+		const isValid = await verifyEmail(params.to);
+		if (!isValid) {
+			console.log(`❌ Invalid email, skipping: ${params.to}`);
+			return { success: false, error: 'Invalid email' };
+		}
+
 		const { data, error } = await resend.emails.send({
 			from: 'Emiliano - CodeTix <emiliano@codetix.com>',
 			to: params.to,
 			subject: params.subject,
-			html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px;">
-          ${params.body.split('\n').map((p) => `<p>${p}</p>`).join('')}
-          
-          <br/>
-          <p>—<br/>
-          <strong>Emiliano</strong><br/>
-          Co-founder, CodeTix<br/>
-          <a href="https://codetix.com">codetix.com</a>
-          </p>
-        </div>
-      `,
+			html: formatEmailHTML(params.body),
 		});
 
 		if (error) {
@@ -42,6 +63,20 @@ export async function sendEmail(params: { to: string; subject: string; body: str
 		console.error('❌ Error:', error);
 		return { success: false, error: error.message };
 	}
+}
+
+function formatEmailHTML(body: string): string {
+	return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      ${body.split('\n').map((p) => `<p style="margin-bottom: 16px;">${p}</p>`).join('')}
+      
+      <hr style="margin: 24px 0; border: none; border-top: 1px solid #e5e7eb;" />
+      
+      <p style="margin-bottom: 8px;"><strong>Emiliano</strong></p>
+      <p style="margin-bottom: 4px; color: #6b7280;">Co-founder, CodeTix</p>
+      <p style="margin-bottom: 0;"><a href="https://codetix.com" style="color: #3b82f6;">codetix.com</a></p>
+    </div>
+  `;
 }
 
 async function logEmailSent(params: any) {

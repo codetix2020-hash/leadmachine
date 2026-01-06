@@ -174,3 +174,5 @@ supabase/migrations/
 
 **¡Listo para usar sin autenticación!** 🎉
 
+
+

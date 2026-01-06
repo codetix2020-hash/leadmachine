@@ -80,3 +80,5 @@ Responde JSON (sin markdown):
 	return JSON.parse(cleaned);
 }
 
+
+

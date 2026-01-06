@@ -49,6 +49,12 @@ export function NavBar() {
 			icon: ZapIcon,
 			isActive: pathname.includes("/persistence"),
 		},
+		{
+			label: "Testing",
+			href: "/app/testing",
+			icon: HomeIcon, // TODO: Cambiar a icono de testing
+			isActive: pathname.includes("/testing"),
+		},
 	];
 
 	return (

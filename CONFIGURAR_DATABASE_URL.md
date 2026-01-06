@@ -64,3 +64,5 @@ Si prefieres ejecutar el SQL manualmente (solo 1 vez):
 
 **Una vez configurado DATABASE_URL, siempre podrás ejecutar `pnpm db:migrate` y todo será automático!** 🚀
 
+
+

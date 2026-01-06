@@ -433,3 +433,5 @@ async function pauseSequence(params: any) {
 		.where(eq(outreachSequences.lead_id, params.lead.id));
 }
 
+
+

@@ -62,3 +62,5 @@ Next.js está compilando las nuevas rutas. Espera ~10-15 segundos y luego:
 ¡Ya debería funcionar correctamente!
 
 
+
+

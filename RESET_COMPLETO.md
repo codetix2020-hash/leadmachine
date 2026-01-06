@@ -90,3 +90,5 @@ ALTER TABLE analytics DISABLE ROW LEVEL SECURITY;
 
 **¡Ejecuta el SQL en Supabase y luego prueba buscar leads!** 🚀
 
+
+

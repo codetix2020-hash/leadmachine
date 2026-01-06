@@ -15,6 +15,24 @@ export async function POST(req: Request) {
 
 		console.log('📧 Webhook received:', event.type);
 
+		// Manejar bounces
+		if (event.type === 'email.bounced') {
+			const { recordBounce } = await import('@/lib/email/bounce-handler');
+			
+			const allLeads = await db.select().from(leads);
+			const bouncedEmail = event.data?.to || event.data?.email;
+			const lead = allLeads.find((l) => l.email && l.email.toLowerCase() === bouncedEmail?.toLowerCase());
+
+			await recordBounce({
+				email: bouncedEmail,
+				leadId: lead?.id,
+				bounceType: event.data?.bounce_type === 'Permanent' ? 'hard' : 'soft',
+				reason: event.data?.bounce_reason || 'Unknown',
+			});
+
+			return NextResponse.json({ received: true, handled: 'bounce' });
+		}
+
 		// Solo procesar respuestas (replies) de Resend
 		// Resend envía eventos como: email.sent, email.delivered, email.bounced, etc
 		// Para replies, necesitamos verificar el evento correcto
@@ -114,4 +132,6 @@ ${c.message_received ? 'Lead: ' + c.message_received : ''}`,
 		return NextResponse.json({ error: error.message }, { status: 500 });
 	}
 }
+
+
 

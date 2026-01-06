@@ -195,3 +195,5 @@ async function updateLeadStatus(leadId: string, sentiment: string) {
 		.where(eq(leads.id, leadId));
 }
 
+
+

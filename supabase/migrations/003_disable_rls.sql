@@ -12,3 +12,5 @@ FROM pg_tables
 WHERE schemaname = 'public' 
 AND tablename IN ('leads', 'conversations', 'outreach_sequences', 'analytics');
 
+
+

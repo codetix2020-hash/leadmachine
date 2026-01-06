@@ -60,3 +60,5 @@ export async function scrapeGoogleMaps(
 // Exportar funciones específicas por tipo
 export { findCodetixLeads, findReservasproLeads };
 
+
+

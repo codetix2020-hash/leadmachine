@@ -183,3 +183,5 @@ CREATE POLICY "Enable insert access for authenticated users" ON analytics
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
 
+
+

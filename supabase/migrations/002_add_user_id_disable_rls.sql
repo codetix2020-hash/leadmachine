@@ -29,3 +29,5 @@ DROP POLICY IF EXISTS "Enable insert access for authenticated users" ON analytic
 -- ✅ LISTO: Ahora puedes usar la app sin autenticación
 -- Los leads se guardarán con user_id = '00000000-0000-0000-0000-000000000000'
 
+
+

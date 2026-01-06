@@ -23,3 +23,5 @@ export function prioritizeLeads(leads: any[]): any[] {
 		.sort((a, b) => b.contactability - a.contactability);
 }
 
+
+
