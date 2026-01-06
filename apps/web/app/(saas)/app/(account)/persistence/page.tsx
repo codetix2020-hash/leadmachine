@@ -126,7 +126,7 @@ export default function PersistencePage() {
 					<div>✅ Búsqueda automática en 50+ ciudades España</div>
 					<div>✅ 16 tipos de negocio para ReservasPro</div>
 					<div>✅ Auto-enrichment de nuevos leads</div>
-					<div>✅ Auto-outreach a leads calificados (score >70)</div>
+					<div>✅ Auto-outreach a leads calificados (score &gt;70)</div>
 					<div>✅ Ejecución cada 6 horas (mass discovery)</div>
 					<div>✅ Ejecución cada 2 horas (enrichment)</div>
 					<div>✅ Ejecución cada 4 horas (outreach)</div>
