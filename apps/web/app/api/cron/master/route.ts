@@ -41,9 +41,13 @@ export async function GET() {
 		// 5. Daily digest a las 9am
 		if (hour === 9) {
 			console.log('📊 Sending daily digest...');
-			const { sendDailyDigest } = await import('@/lib/notifications/daily-digest');
-			await sendDailyDigest();
-			results.digest = 'sent';
+			try {
+				const { sendDailyDigest } = await import('@/lib/notifications/daily-digest');
+				await sendDailyDigest();
+				results.digest = 'sent';
+			} catch (e) {
+				console.error('Error sending daily digest:', e);
+			}
 		}
 
 		console.log('✅ MASTER CRON COMPLETED');

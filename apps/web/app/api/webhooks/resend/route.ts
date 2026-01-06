@@ -102,10 +102,15 @@ ${c.message_received ? 'Lead: ' + c.message_received : ''}`,
 
 		console.log('🤖 Parsed response:', parsed);
 
-		// Notificar respuesta a Slack
+		// Notificar respuesta
 		try {
-			const { notifyResponse } = await import('@/lib/notifications/slack-notifier');
+			const { notifyResponse, notifyCallScheduled } = await import('@/lib/notifications/slack-notifier');
 			await notifyResponse(lead, parsed.sentiment || 'neutral');
+
+			// Si agendó call
+			if (parsed.intent === 'schedule_call' || lead.status === 'call_scheduled') {
+				await notifyCallScheduled(lead);
+			}
 		} catch (e) {
 			console.error('Error notifying Slack:', e);
 		}

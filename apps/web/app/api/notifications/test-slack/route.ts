@@ -4,12 +4,12 @@ import { sendSlackNotification } from '@/lib/notifications/slack-notifier';
 export async function GET() {
 	try {
 		await sendSlackNotification({
-			type: 'lead_hot',
-			title: 'Test Notification',
+			type: 'info',
+			title: '🧪 Test Notification',
 			message: 'LEADMACHINE funcionando correctamente',
 			data: {
 				Sistema: 'Operativo',
-				Timestamp: new Date().toISOString(),
+				Timestamp: new Date().toLocaleString(),
 			},
 			urgency: 'low',
 		});

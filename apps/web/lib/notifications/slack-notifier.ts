@@ -1,7 +1,7 @@
 const SLACK_WEBHOOK = process.env.SLACK_WEBHOOK_URL;
 
 interface SlackNotification {
-	type: 'lead_hot' | 'response_received' | 'call_scheduled' | 'deal_closed' | 'error';
+	type: 'lead_hot' | 'response_received' | 'call_scheduled' | 'deal_closed' | 'error' | 'info';
 	title: string;
 	message: string;
 	data?: any;
@@ -55,6 +55,7 @@ function getEmoji(type: string): string {
 		call_scheduled: '📅',
 		deal_closed: '💰',
 		error: '❌',
+		info: '📢',
 	};
 	return emojis[type] || '📢';
 }
@@ -73,13 +74,13 @@ function getColor(urgency: string): string {
 export async function notifyHotLead(lead: any, score: number) {
 	await sendSlackNotification({
 		type: 'lead_hot',
-		title: 'Lead Caliente Detectado',
+		title: '🔥 Lead Caliente Detectado',
 		message: `${lead.company_name || lead.companyName} - Score: ${score}/100`,
 		data: {
 			Negocio: lead.company_name || lead.companyName,
-			Score: score,
+			Score: `${score}/100`,
 			'Deal estimado': `€${lead.estimatedDealSize || 0}`,
-			Ubicación: lead.location,
+			Ubicación: lead.location || 'N/A',
 		},
 		urgency: score > 90 ? 'critical' : 'high',
 	});
@@ -88,12 +89,12 @@ export async function notifyHotLead(lead: any, score: number) {
 export async function notifyResponse(lead: any, sentiment: string) {
 	await sendSlackNotification({
 		type: 'response_received',
-		title: 'Lead Respondió',
+		title: '📧 Lead Respondió',
 		message: `${lead.company_name || lead.companyName} - ${sentiment}`,
 		data: {
 			Negocio: lead.company_name || lead.companyName,
 			Sentiment: sentiment,
-			Email: lead.email,
+			Email: lead.email || 'N/A',
 		},
 		urgency: sentiment === 'interested' ? 'high' : 'medium',
 	});
@@ -102,12 +103,12 @@ export async function notifyResponse(lead: any, sentiment: string) {
 export async function notifyCallScheduled(lead: any) {
 	await sendSlackNotification({
 		type: 'call_scheduled',
-		title: 'Call Agendado',
+		title: '📅 Call Agendado',
 		message: `${lead.company_name || lead.companyName} agendó una llamada`,
 		data: {
 			Negocio: lead.company_name || lead.companyName,
-			Email: lead.email,
-			Phone: lead.phone,
+			Email: lead.email || 'N/A',
+			Phone: lead.phone || 'N/A',
 		},
 		urgency: 'critical',
 	});
@@ -121,9 +122,19 @@ export async function notifyDealClosed(lead: any, amount: number) {
 		data: {
 			Negocio: lead.company_name || lead.companyName,
 			Monto: `€${amount}`,
-			Producto: lead.type,
+			Producto: lead.type || 'N/A',
 		},
 		urgency: 'critical',
+	});
+}
+
+export async function notifyError(error: any) {
+	await sendSlackNotification({
+		type: 'error',
+		title: '❌ Error del Sistema',
+		message: error.message || 'Unknown error',
+		data: error.context,
+		urgency: 'high',
 	});
 }
 

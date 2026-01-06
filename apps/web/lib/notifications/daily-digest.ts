@@ -29,7 +29,7 @@ export async function sendDailyDigest() {
 	});
 
 	await sendSlackNotification({
-		type: 'lead_hot',
+		type: 'info',
 		title: '📊 Daily Digest - LEADMACHINE',
 		message: 'Resumen del día',
 		data: {

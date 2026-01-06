@@ -1,3 +1,5 @@
+import { notifyError } from '@/lib/notifications/slack-notifier';
+
 export async function trackError(error: {
 	type: string;
 	message: string;
@@ -6,19 +8,10 @@ export async function trackError(error: {
 }) {
 	console.error('🔴 Error tracked:', error);
 
-	// Log en DB
-	// TODO: Implementar tabla errors
+	// Log en DB (TODO: tabla errors)
 
-	// Notificar a Slack si es crítico
-	const { sendSlackNotification } = await import('@/lib/notifications/slack-notifier');
-
-	await sendSlackNotification({
-		type: 'error',
-		title: `Error: ${error.type}`,
-		message: error.message,
-		data: error.context,
-		urgency: 'high',
-	});
+	// Notificar a Slack
+	await notifyError(error);
 }
 
 export function setupErrorHandlers() {
