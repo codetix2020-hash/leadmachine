@@ -82,6 +82,20 @@ export async function startOutreachSequence(params: { leadId: string; lead: any;
 		};
 	}
 
+	// Instagram engagement si tiene cuenta
+	try {
+		const { extractInstagramFromLead, performInstagramEngagement } = await import('@/lib/social/instagram-bot');
+		const igUsername = extractInstagramFromLead(lead);
+		if (igUsername) {
+			await performInstagramEngagement({
+				lead,
+				instagramUsername: igUsername,
+			});
+		}
+	} catch (e) {
+		console.error('Error performing Instagram engagement:', e);
+	}
+
 	return {
 		...result,
 		contactMethod: method,

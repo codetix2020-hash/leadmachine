@@ -10,6 +10,7 @@ import {
 	InboxIcon,
 	ZapIcon,
 	BellIcon,
+	RocketIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -20,6 +21,7 @@ export function NavBar() {
 	const { useSidebarLayout } = config.ui.saas;
 
 	const menuItems = [
+		// Leads Section
 		{
 			label: "Leads",
 			href: "/app/leads",
@@ -33,17 +35,19 @@ export function NavBar() {
 			isActive: pathname.includes("/pipeline"),
 		},
 		{
-			label: "Analytics",
-			href: "/app/analytics",
-			icon: BarChart3Icon,
-			isActive: pathname.includes("/analytics"),
-		},
-		{
 			label: "Inbox",
 			href: "/app/inbox",
 			icon: InboxIcon,
 			isActive: pathname.includes("/inbox"),
 		},
+		// Analytics Section
+		{
+			label: "Analytics",
+			href: "/app/analytics",
+			icon: BarChart3Icon,
+			isActive: pathname.includes("/analytics"),
+		},
+		// System Section
 		{
 			label: "Persistence",
 			href: "/app/persistence",
@@ -61,6 +65,12 @@ export function NavBar() {
 			href: "/app/monitoring",
 			icon: BellIcon,
 			isActive: pathname.includes("/monitoring"),
+		},
+		{
+			label: "Production",
+			href: "/app/production",
+			icon: RocketIcon,
+			isActive: pathname.includes("/production"),
 		},
 	];
 

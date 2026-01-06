@@ -1,33 +1,43 @@
-/**
- * Health check endpoint para verificar que el servidor y la BD funcionan
- */
 import { NextResponse } from 'next/server';
-import { initializeDatabase, sqlite } from '@/lib/db/client';
+import { initializeDatabase } from '@/lib/db/client';
 
 export async function GET() {
+	const checks = {
+		database: false,
+		api: false,
+		env: false,
+	};
+
+	// Check database
 	try {
 		await initializeDatabase();
-		
-		// Probar conexión a la BD
-		await sqlite.execute('SELECT 1');
-		
-		return NextResponse.json({
-			status: 'ok',
-			database: 'connected',
-			timestamp: new Date().toISOString(),
-		});
+		const { db } = await import('@/lib/db/client');
+		const { leads } = await import('@/lib/db/schema');
+		await db.select().from(leads).limit(1);
+		checks.database = true;
 	} catch (error) {
-		return NextResponse.json(
-			{
-				status: 'error',
-				database: 'disconnected',
-				error: error instanceof Error ? error.message : 'Unknown error',
-				timestamp: new Date().toISOString(),
-			},
-			{ status: 500 }
-		);
+		console.error('DB check failed:', error);
 	}
+
+	// Check API keys
+	checks.env = !!(
+		process.env.ANTHROPIC_API_KEY &&
+		process.env.GOOGLE_MAPS_API_KEY &&
+		process.env.RESEND_API_KEY
+	);
+
+	checks.api = true;
+
+	const healthy = Object.values(checks).every((v) => v === true);
+
+	return NextResponse.json(
+		{
+			healthy,
+			checks,
+			timestamp: new Date().toISOString(),
+		},
+		{
+			status: healthy ? 200 : 503,
+		},
+	);
 }
-
-
-

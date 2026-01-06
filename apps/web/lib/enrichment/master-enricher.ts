@@ -1,9 +1,12 @@
 import { analyzeWebsite } from './analyzers/website-analyzer';
 import { analyzeReviews } from './analyzers/review-analyzer';
 import Anthropic from '@anthropic-ai/sdk';
+import { safeExecute } from '@/lib/utils/retry-handler';
 
 export async function deepEnrichLead(lead: any) {
-	console.log(`🔍 Deep enriching: ${lead.company_name || lead.companyName}`);
+	return await safeExecute(
+		async () => {
+			console.log(`🔍 Deep enriching: ${lead.company_name || lead.companyName}`);
 
 	// 1. Análisis de website
 	let websiteAnalysis = null;
