@@ -121,15 +121,15 @@ Responde SOLO JSON (sin markdown):
 		...analysis,
 	};
 
-	// Si score > 85, notificar lead hot
-	if (analysis.predictiveScores?.closeProbability > 85) {
-		try {
-			const { notifyHotLead } = await import('@/lib/notifications/slack-notifier');
-			await notifyHotLead(data.lead, analysis.predictiveScores.closeProbability);
-		} catch (e) {
-			console.error('Error notifying hot lead:', e);
+		// Si score > 85, notificar lead hot
+		if (analysis.predictiveScores?.closeProbability > 85) {
+			try {
+				const { notifyHotLead } = await import('@/lib/notifications/slack-notifier');
+				await notifyHotLead(data.lead, analysis.predictiveScores.closeProbability);
+			} catch (e) {
+				console.error('Error notifying hot lead:', e);
+			}
 		}
-	}
 
-	return result;
+		return result;
 }
