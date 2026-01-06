@@ -9,6 +9,7 @@ import {
 	BarChart3Icon,
 	InboxIcon,
 	ZapIcon,
+	BellIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -54,6 +55,12 @@ export function NavBar() {
 			href: "/app/testing",
 			icon: HomeIcon, // TODO: Cambiar a icono de testing
 			isActive: pathname.includes("/testing"),
+		},
+		{
+			label: "Monitoring",
+			href: "/app/monitoring",
+			icon: BellIcon,
+			isActive: pathname.includes("/monitoring"),
 		},
 	];
 

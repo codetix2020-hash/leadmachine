@@ -38,6 +38,14 @@ export async function GET() {
 		console.log('⚡ Executing persistence...');
 		results.persistence = await executePersistenceActions();
 
+		// 5. Daily digest a las 9am
+		if (hour === 9) {
+			console.log('📊 Sending daily digest...');
+			const { sendDailyDigest } = await import('@/lib/notifications/daily-digest');
+			await sendDailyDigest();
+			results.digest = 'sent';
+		}
+
 		console.log('✅ MASTER CRON COMPLETED');
 
 		return NextResponse.json({

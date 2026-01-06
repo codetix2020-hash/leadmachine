@@ -112,9 +112,21 @@ Responde SOLO JSON (sin markdown):
 	const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 	const analysis = JSON.parse(cleaned);
 
-	return {
+	const result = {
 		website: data.website,
 		reviews: data.reviews,
 		...analysis,
 	};
+
+	// Si score > 85, notificar lead hot
+	if (analysis.predictiveScores?.closeProbability > 85) {
+		try {
+			const { notifyHotLead } = await import('@/lib/notifications/slack-notifier');
+			await notifyHotLead(data.lead, analysis.predictiveScores.closeProbability);
+		} catch (e) {
+			console.error('Error notifying hot lead:', e);
+		}
+	}
+
+	return result;
 }

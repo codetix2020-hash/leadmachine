@@ -102,6 +102,14 @@ ${c.message_received ? 'Lead: ' + c.message_received : ''}`,
 
 		console.log('🤖 Parsed response:', parsed);
 
+		// Notificar respuesta a Slack
+		try {
+			const { notifyResponse } = await import('@/lib/notifications/slack-notifier');
+			await notifyResponse(lead, parsed.sentiment || 'neutral');
+		} catch (e) {
+			console.error('Error notifying Slack:', e);
+		}
+
 		// 4. Auto-responder si procede
 		if (parsed.shouldAutoRespond) {
 			await autoRespond({
