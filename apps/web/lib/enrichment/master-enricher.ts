@@ -8,33 +8,37 @@ export async function deepEnrichLead(lead: any) {
 		async () => {
 			console.log(`🔍 Deep enriching: ${lead.company_name || lead.companyName}`);
 
-	// 1. Análisis de website
-	let websiteAnalysis = null;
-	if (lead.website) {
-		websiteAnalysis = await analyzeWebsite(lead.website);
-	}
-
-	// 2. Análisis de reviews
-	let reviewAnalysis = null;
-	if (lead.sourceData || lead.source_data) {
-		try {
-			const sourceData = JSON.parse(lead.sourceData || lead.source_data || '{}');
-			if (sourceData.reviews) {
-				reviewAnalysis = await analyzeReviews(sourceData.reviews);
+			// 1. Análisis de website
+			let websiteAnalysis = null;
+			if (lead.website) {
+				websiteAnalysis = await analyzeWebsite(lead.website);
 			}
-		} catch (e) {
-			console.error('Error parsing source data:', e);
-		}
-	}
 
-	// 3. Claude genera análisis maestro (detecta qué vender)
-	const masterAnalysis = await generateMasterAnalysis({
-		lead,
-		website: websiteAnalysis,
-		reviews: reviewAnalysis,
-	});
+			// 2. Análisis de reviews
+			let reviewAnalysis = null;
+			if (lead.sourceData || lead.source_data) {
+				try {
+					const sourceData = JSON.parse(lead.sourceData || lead.source_data || '{}');
+					if (sourceData.reviews) {
+						reviewAnalysis = await analyzeReviews(sourceData.reviews);
+					}
+				} catch (e) {
+					console.error('Error parsing source data:', e);
+				}
+			}
 
-	return masterAnalysis;
+			// 3. Claude genera análisis maestro (detecta qué vender)
+			const masterAnalysis = await generateMasterAnalysis({
+				lead,
+				website: websiteAnalysis,
+				reviews: reviewAnalysis,
+			});
+
+			return masterAnalysis;
+		},
+		null, // fallback
+		`Enrichment for ${lead.company_name || lead.companyName}`,
+	);
 }
 
 async function generateMasterAnalysis(data: any) {
@@ -121,15 +125,15 @@ Responde SOLO JSON (sin markdown):
 		...analysis,
 	};
 
-		// Si score > 85, notificar lead hot
-		if (analysis.predictiveScores?.closeProbability > 85) {
-			try {
-				const { notifyHotLead } = await import('@/lib/notifications/slack-notifier');
-				await notifyHotLead(data.lead, analysis.predictiveScores.closeProbability);
-			} catch (e) {
-				console.error('Error notifying hot lead:', e);
-			}
+	// Si score > 85, notificar lead hot
+	if (analysis.predictiveScores?.closeProbability > 85) {
+		try {
+			const { notifyHotLead } = await import('@/lib/notifications/slack-notifier');
+			await notifyHotLead(data.lead, analysis.predictiveScores.closeProbability);
+		} catch (e) {
+			console.error('Error notifying hot lead:', e);
 		}
+	}
 
-		return result;
+	return result;
 }
